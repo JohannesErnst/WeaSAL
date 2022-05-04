@@ -8,6 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #      Define network architectures
+#      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -16,6 +17,7 @@
 
 from models.blocks import *
 import numpy as np
+from torch.nn import Dropout
 
 
 def p2p_fitting_regularizer(net):
@@ -295,6 +297,9 @@ class KPFCNN(nn.Module):
 
         self.head_mlp = UnaryBlock(out_dim, config.first_features_dim, False, 0)
         self.head_softmax = UnaryBlock(config.first_features_dim, self.C, False, 0, no_relu=True)
+        self.dropout = config.dropout
+        if config.dropout:
+            self.droplayer = Dropout(p = float(config.dropout))
 
         ################
         # Network Losses
@@ -335,6 +340,9 @@ class KPFCNN(nn.Module):
             if block_i in self.decoder_concats:
                 x = torch.cat([x, skip_x.pop()], dim=1)
             x = block_op(x, batch)
+
+        if self.dropout:
+            sa = self.droplayer(x)
 
         # Head of network
         x = self.head_mlp(x, batch)

@@ -7,14 +7,13 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Callable script to start a training on ModelNet40 dataset
+#      Callable script to test networks on variable datasets
+#      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #      Hugues THOMAS - 06/03/2020
 #
-
-
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #           Imports and global variables
@@ -29,9 +28,7 @@ import sys
 import torch
 
 # Dataset
-from datasets.ModelNet40 import *
-from datasets.S3DIS import *
-from datasets.SemanticKitti import *
+from datasets.Vaihingen3D import *
 from torch.utils.data import DataLoader
 
 from utils.config import Config
@@ -162,18 +159,15 @@ if __name__ == '__main__':
         set = 'test'
 
     # Initiate dataset
-    if config.dataset == 'ModelNet40':
-        test_dataset = ModelNet40Dataset(config, train=False)
-        test_sampler = ModelNet40Sampler(test_dataset)
-        collate_fn = ModelNet40Collate
-    elif config.dataset == 'S3DIS':
-        test_dataset = S3DISDataset(config, set='validation', use_potentials=True)
-        test_sampler = S3DISSampler(test_dataset)
-        collate_fn = S3DISCollate
-    elif config.dataset == 'SemanticKitti':
-        test_dataset = SemanticKittiDataset(config, set=set, balance_classes=False)
-        test_sampler = SemanticKittiSampler(test_dataset)
-        collate_fn = SemanticKittiCollate
+    if config.dataset == 'Vaihingen3D':
+        test_dataset = Vaihingen3DDataset(config, set=set, use_potentials=True)
+        test_sampler = Vaihingen3DSampler(test_dataset)
+        collate_fn = Vaihingen3DCollate
+    elif config.dataset == 'DALES':
+        print("Not implemented")
+        # test_dataset = DALESDataset(config, set=set, use_potentials=True)
+        # test_sampler = DALESSampler(test_dataset)
+        # collate_fn = DALESCollate
     else:
         raise ValueError('Unsupported dataset : ' + config.dataset)
 

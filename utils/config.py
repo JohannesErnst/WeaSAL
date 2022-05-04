@@ -263,6 +263,9 @@ class Config:
                 elif line_info[0] == 'class_w':
                     self.class_w = [float(w) for w in line_info[2:]]
 
+                elif line_info[0] == 'dropout':
+                    setattr(self, line_info[0], line_info[2]) 
+
                 elif hasattr(self, line_info[0]):
                     attr_type = type(getattr(self, line_info[0]))
                     if attr_type == bool:
@@ -379,4 +382,11 @@ class Config:
                 text_file.write('epoch_steps = {:d}\n'.format(self.epoch_steps))
             text_file.write('validation_size = {:d}\n'.format(self.validation_size))
             text_file.write('checkpoint_gap = {:d}\n'.format(self.checkpoint_gap))
+
+            # Other parameters
+            text_file.write('# Other parameters\n')
+            text_file.write('# *******************\n\n')
+            
+            if hasattr(self, 'dropout'):
+                text_file.write('dropout = {:.3f}\n'.format(self.dropout))
 
