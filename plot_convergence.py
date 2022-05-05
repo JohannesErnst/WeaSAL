@@ -7,14 +7,13 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Callable script to test any model on any dataset
+#      Callable script to plot convergence of training runs
+#      - adapted by Johannes Ernst, 2022
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #      Hugues THOMAS - 11/06/2018
 #
-
-
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #           Imports and global variables
@@ -37,9 +36,7 @@ from utils.metrics import IoU_from_confusions, smooth_metrics, fast_confusion
 from utils.ply import read_ply
 
 # Datasets
-from datasets.ModelNet40 import ModelNet40Dataset
-from datasets.S3DIS import S3DISDataset
-from datasets.SemanticKitti import SemanticKittiDataset
+from datasets.Vaihingen3D import Vaihingen3DDataset
 
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -229,6 +226,7 @@ def compare_trainings(list_of_paths, list_of_labels=None):
 
     all_epochs = []
     all_loss = []
+    all_acc = []
     all_lr = []
     all_times = []
     all_RAMs = []
@@ -260,7 +258,9 @@ def compare_trainings(list_of_paths, list_of_labels=None):
             epochs_d[bool0] += steps[bool0] / e_n
         smooth_n = int(np.mean(epoch_n) * smooth_epochs)
         smooth_loss = running_mean(L_out, smooth_n, stride=stride)
+        smooth_acc = running_mean(acc, smooth_n, stride=stride)
         all_loss += [smooth_loss]
+        all_acc += [smooth_acc]
         all_epochs += [epochs_d[smooth_n:-smooth_n:stride]]
         all_times += [t[smooth_n:-smooth_n:stride]]
 
@@ -319,6 +319,27 @@ def compare_trainings(list_of_paths, list_of_labels=None):
     ax = fig.gca()
     ax.grid(linestyle='-.', which='both')
     # ax.set_yticks(np.arange(0.8, 1.02, 0.02))
+
+    # Plots training accuracy
+    # **********
+
+    # Figure
+    fig = plt.figure('accuracy')
+    for i, label in enumerate(list_of_labels):
+        plt.plot(all_epochs[i], all_acc[i], linewidth=1, label=label)
+
+    # Set names for axes
+    plt.xlabel('epochs')
+    plt.ylabel('accuracy')
+
+    # Display legends and title
+    plt.legend(loc=4)
+    plt.title('Training accuracy compare')
+
+    # Customize the graph
+    ax = fig.gca()
+    ax.grid(linestyle='-.', which='both')
+    # ax.set_yticks(np.arange(0.8, 1.02, 0.02))   
 
     # Plot Times
     # **********
@@ -713,8 +734,8 @@ def experiment_name_1():
     """
 
     # Using the dates of the logs, you can easily gather consecutive ones. All logs should be of the same dataset.
-    start = 'Log_2020-04-22_11-52-58'
-    end = 'Log_2023-07-29_12-40-27'
+    start = 'Log_2022-05-04_15-02-36'
+    end = 'Log_2022-05-04_15-02-36'
 
     # Name of the result path
     res_path = 'results'
@@ -723,10 +744,8 @@ def experiment_name_1():
     logs = np.sort([join(res_path, l) for l in listdir_str(res_path) if start <= l <= end])
 
     # Give names to the logs (for plot legends)
-    logs_names = ['name_log_1',
-                  'name_log_2',
-                  'name_log_3',
-                  'name_log_4']
+    logs_names = ['V3D all classes',
+                  '']
 
     # safe check log names
     logs_names = np.array(logs_names[:len(logs)])
@@ -743,7 +762,7 @@ def experiment_name_2():
     """
 
     # Using the dates of the logs, you can easily gather consecutive ones. All logs should be of the same dataset.
-    start = 'Log_2020-04-22_11-52-58'
+    start = 'Log_2022-04-24_13-41-11'
     end = 'Log_2020-05-22_11-52-58'
 
     # Name of the result path
@@ -812,13 +831,14 @@ if __name__ == '__main__':
     if config.dataset_task == 'classification':
         compare_convergences_classif(logs, logs_names)
     elif config.dataset_task == 'cloud_segmentation':
-        if config.dataset.startswith('S3DIS'):
-            dataset = S3DISDataset(config, load_data=False)
-            compare_convergences_segment(dataset, logs, logs_names)
+        if config.dataset.startswith('Vaihingen3D'):
+            dataset = Vaihingen3DDataset(config, load_data=False)
+            compare_convergences_segment(dataset, logs, logs_names) 
+        # elif config.dataset.startswith('DALES'):
+        #     dataset = DALESDataset(config, load_data=False)
+        #     compare_convergences_segment(dataset, logs, logs_names)
     elif config.dataset_task == 'slam_segmentation':
-        if config.dataset.startswith('SemanticKitti'):
-            dataset = SemanticKittiDataset(config)
-            compare_convergences_SLAM(dataset, logs, logs_names)
+        raise ValueError('Slam segmentation currently not implemented')
     else:
         raise ValueError('Unsupported dataset : ' + plot_dataset)
 

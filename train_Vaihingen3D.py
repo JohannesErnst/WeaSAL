@@ -8,7 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #      Callable script to start a training on Vaihingen3D dataset
-#      - adapted by Johannes Ernst
+#      - adapted by Johannes Ernst, 2022
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -155,7 +155,7 @@ class Vaihingen3DConfig(Config):
     validation_size = 200
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 5
+    checkpoint_gap = 50
 
     # Augmentations
     augment_scale_anisotropic = True
