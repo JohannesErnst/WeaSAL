@@ -351,8 +351,8 @@ class ModelTester:
                         s += '{:5.2f} '.format(100 * IoU)
                     print(s + '\n')
 
-                # Save real IoU once in a while
-                if int(np.ceil(new_min)) % 10 == 0:
+                # Save real IoU once in a while or when reaching number of desired votes
+                if int(np.ceil(new_min)) % 10 == 0 or last_min > num_votes:
 
                     # Project predictions
                     print('\nReproject Vote #{:d}'.format(int(np.floor(new_min))))

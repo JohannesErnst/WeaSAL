@@ -152,7 +152,7 @@ class Vaihingen3DConfig(Config):
     epoch_steps = 200
 
     # Number of validation examples per epoch
-    validation_size = 200
+    validation_size = 20
 
     # Number of epoch between each checkpoint
     checkpoint_gap = 50

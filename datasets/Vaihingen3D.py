@@ -108,9 +108,10 @@ class Vaihingen3DDataset(PointCloudDataset):
             ply_path = join(self.path, self.train_path)
 
         # Proportion of validation scenes (for now only use validation, cause small)
-        # self.cloud_names = ['Vaihingen3D_Traininig_train', 'Vaihingen3D_Traininig_val', 'Vaihingen3D_EVAL_WITH_REF']
-        self.cloud_names = ['Vaihingen3D_Traininig_val', 'Vaihingen3D_Traininig_val']
-        self.all_splits = [0, 1]
+        self.cloud_names = ['Vaihingen3D_Traininig_train', 'Vaihingen3D_Traininig_val', 'Vaihingen3D_EVAL_WITH_REF']
+        # self.cloud_names = ['Vaihingen3D_Traininig_val', 'Vaihingen3D_Traininig_val']
+        self.all_splits = [0, 1, 2]
+        # self.all_splits = [0, 1]
         self.validation_split = 1
         self.test_split = 2
 
