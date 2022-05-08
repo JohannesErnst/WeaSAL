@@ -7,7 +7,7 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Class handling Vaihingen dataset.
+#      Class handling Vaihingen dataset with weak region-labels.
 #      Implements a Dataset, a Sampler, and a collate_fn
 #      - adapted by Johannes Ernst
 #
@@ -40,7 +40,7 @@ from utils.mayavi_visu import *
 
 from datasets.common import grid_subsampling
 from utils.config import bcolors
-
+from utils.anchors import *
 
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -48,14 +48,14 @@ from utils.config import bcolors
 #       \******************************/
 
 
-class Vaihingen3DDataset(PointCloudDataset):
-    """Class to handle Vaihingen dataset."""
+class Vaihingen3DWLDataset(PointCloudDataset):
+    """Class to handle Vaihingen dataset with weak region-labels (WL)."""
 
     def __init__(self, config, set='training', use_potentials=True, load_data=True):
         """
         This dataset is small enough to be stored in-memory, so load all point clouds here
         """
-        PointCloudDataset.__init__(self, 'Vaihingen3D')
+        PointCloudDataset.__init__(self, 'Vaihingen3DWL')
 
         ############
         # Parameters
@@ -108,10 +108,10 @@ class Vaihingen3DDataset(PointCloudDataset):
             ply_path = join(self.path, self.train_path)
 
         # Define datasets and splits
-        self.cloud_names = ['Vaihingen3D_Traininig_train', 'Vaihingen3D_Traininig_val', 'Vaihingen3D_EVAL_WITH_REF']
-        # self.cloud_names = ['Vaihingen3D_Traininig_val', 'Vaihingen3D_Traininig_val']
-        self.all_splits = [0, 1, 2]
-        # self.all_splits = [0, 1]
+        # self.cloud_names = ['Vaihingen3D_Traininig_train', 'Vaihingen3D_Traininig_val', 'Vaihingen3D_EVAL_WITH_REF']
+        self.cloud_names = ['Vaihingen3D_Traininig_val', 'Vaihingen3D_Traininig_val']
+        # self.all_splits = [0, 1, 2]
+        self.all_splits = [0, 1]        # jer
         self.validation_split = 1
         self.test_split = 2
 
@@ -121,7 +121,7 @@ class Vaihingen3DDataset(PointCloudDataset):
         elif self.set in ['validation', 'test', 'ERF']:
             self.epoch_n = config.validation_size * config.batch_num
         else:
-            raise ValueError('Unknown set for Vaihingen3D data: ', self.set)
+            raise ValueError('Unknown set for Vaihingen3DWL data: ', self.set)
 
         # Stop data is not needed
         if not load_data:
@@ -131,7 +131,7 @@ class Vaihingen3DDataset(PointCloudDataset):
         # Prepare ply files
         ###################
 
-        self.prepare_Vaihingen3D_ply()
+        # self.prepare_Vaihingen3DWL_ply()   # jer
 
         ################
         # Load ply files
@@ -150,7 +150,7 @@ class Vaihingen3DDataset(PointCloudDataset):
                 if self.all_splits[i] == self.validation_split:
                     self.files += [join(ply_path, f + '.ply')]
             else:
-                raise ValueError('Unknown set for Vaihingen3D data: ', self.set)
+                raise ValueError('Unknown set for Vaihingen3DWL data: ', self.set)
 
         if self.set == 'training':
             self.cloud_names = [f for i, f in enumerate(self.cloud_names)
@@ -184,6 +184,9 @@ class Vaihingen3DDataset(PointCloudDataset):
         # Initialize value for batch limit (max number of points per batch).
         self.batch_limit = torch.tensor([1], dtype=torch.float32)
         self.batch_limit.share_memory_()
+
+        # Anchor
+        # Continue here jer
 
         # Initialize potentials
         if use_potentials:
@@ -627,7 +630,7 @@ class Vaihingen3DDataset(PointCloudDataset):
 
         return input_list
 
-    def prepare_Vaihingen3D_ply(self):
+    def prepare_Vaihingen3DWL_ply(self):
         # Preparing files by reducing coordinates and converting to float32
 
         print('\nPreparing ply files')
@@ -881,10 +884,10 @@ class Vaihingen3DDataset(PointCloudDataset):
 #       \********************************/
 
 
-class Vaihingen3DSampler(Sampler):
-    """Sampler for Vaihingen3D"""
+class Vaihingen3DWLSampler(Sampler):
+    """Sampler for Vaihingen3DWL"""
 
-    def __init__(self, dataset: Vaihingen3DDataset):
+    def __init__(self, dataset: Vaihingen3DWLDataset):
         Sampler.__init__(self, dataset)
 
         # Dataset used by the sampler (no copy is made in memory)
@@ -1343,8 +1346,8 @@ class Vaihingen3DSampler(Sampler):
         return
 
 
-class Vaihingen3DCustomBatch:
-    """Custom batch definition with memory pinning for Vaihingen3D"""
+class Vaihingen3DWLCustomBatch:
+    """Custom batch definition with memory pinning for Vaihingen3DWL"""
 
     def __init__(self, input_list):
 
@@ -1482,8 +1485,8 @@ class Vaihingen3DCustomBatch:
         return all_p_list
 
 
-def Vaihingen3DCollate(batch_data):
-    return Vaihingen3DCustomBatch(batch_data)
+def Vaihingen3DWLCollate(batch_data):
+    return Vaihingen3DWLCustomBatch(batch_data)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
