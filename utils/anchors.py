@@ -70,31 +70,37 @@ def get_anchors(points, in_radius, xyz_offset=[0,0,0], method='full'):
 
 def remove_empty_anchors(input_tree, anchors, radius):
     """
-    Return subregions (defined by anchors) that have less than 3 points inside
-    Double check the >2 part jer
+    Return anchors (i.e. subregions) that have less than 3 points inside
+    Double check the > 2 part -jer
     """
     clean_anchors = []
     for i in range(anchors.shape[0]):
         # Collect number of points in subregion
         center_point = anchors[i].reshape(1, -1)
         input_inds = input_tree.query_radius(center_point, r=radius)[0]
-        n = input_inds.shape[0]
+        n = input_inds.shape[0]         # check if n is actually number of points -jer
+
+        # Save anchors with less than 3 points
         if n>2 :
             clean_anchors += [anchors[i]]
 
     return np.array(clean_anchors)
 
 def anchors_part_lbs(input_tree, anchors, lbs, radius, n_class=9):
-    # Create description here jer
+    """
+    Return anchors (i.e. subregions) that have no points inside
+    """
     clean_anchors = []
     anchors_dict = dict()
-    achor_lbs = dict()
+    anchor_lbs = dict()
     cc = 0
     for i in range(anchors.shape[0]):
         # Collect number of points in subregion
         center_point = anchors[i].reshape(1, -1)
         input_inds = input_tree.query_radius(center_point, r=radius)[0]
         n = input_inds.shape[0]
+
+        # Save anchors with no points 
         if n>0 :
             clean_anchors += [anchors[i]]
             anchors_dict[cc] = [[input_inds], [anchors[i]]]
@@ -102,30 +108,34 @@ def anchors_part_lbs(input_tree, anchors, lbs, radius, n_class=9):
             cls_lbs = np.unique(slc_lbs)
             cloud_labels = np.zeros((n_class))
             cloud_labels[cls_lbs] = 1
-            achor_lbs[cc] = cloud_labels    
+            anchor_lbs[cc] = cloud_labels    
             cc = cc + 1
             
     clean_anchors = np.array(clean_anchors)
     anchor_tree = KDTree(clean_anchors, leaf_size=10)
-    return clean_anchors, anchor_tree, anchors_dict, achor_lbs
+    return clean_anchors, anchor_tree, anchors_dict, anchor_lbs
 
-def update_anchors(input_tree, clean_anchors, anchor_tree, anchors_dict, achor_lbs, sub_radius):
-    # Create description here jer
+def update_anchors(input_tree, clean_anchors, anchor_tree, anchors_dict, anchor_lbs, sub_radius):
+    """
+    Update anchors (i.e. subregions) and labels according to overlap
+    """
     cc = len(anchors_dict.keys())
     print(cc)
     all_cc = 0
     points = np.array(input_tree.data)
-    # search neighbouring pts
+
+    # Search neighbouring points
     anchor_nei_idx, dists = anchor_tree.query_radius(clean_anchors,
                                             r=1.5*sub_radius,
                                             return_distance=True)    
-    
+                                            
+    # For all anchors
     for idx in range(len(anchor_nei_idx)):
-        
         nei_mask = anchor_nei_idx[idx]>idx
         neis = anchor_nei_idx[idx][nei_mask]
         i_idxs = anchors_dict[idx][0][0]
         
+        # For all neighbours
         for nei in neis:        
             nei_idxs = anchors_dict[nei][0][0]
             overlap = np.in1d(i_idxs, nei_idxs)
@@ -133,19 +143,19 @@ def update_anchors(input_tree, clean_anchors, anchor_tree, anchors_dict, achor_l
                 continue              
             new_idxs = i_idxs[overlap]
     
-            if (achor_lbs[idx]!=achor_lbs[nei]).sum()>0: # make sure two sub-region have different class label
-                # store new anchors and its lb
+            # If two subregions have different class labels
+            if (anchor_lbs[idx] != anchor_lbs[nei]).sum() > 0:
+                # Store new anchors and its label
                 new_anchor = np.mean(points[new_idxs], axis=0)
                 anchors_dict[cc] = [[new_idxs], [new_anchor]]
-                achor_lbs[cc] = achor_lbs[idx] * achor_lbs[nei]
+                anchor_lbs[cc] = anchor_lbs[idx] * anchor_lbs[nei]
                 clean_anchors = np.vstack((clean_anchors, np.expand_dims(new_anchor, axis=0)))
                 
-                all_cc = all_cc+achor_lbs[cc]
+                all_cc = all_cc + anchor_lbs[cc]
                 
                 cc = cc+1
-                # print(cc)
                 
     print(cc)
     print(all_cc)
     anchor_tree = KDTree(clean_anchors, leaf_size=10)
-    return clean_anchors, anchor_tree, anchors_dict, achor_lbs
+    return clean_anchors, anchor_tree, anchors_dict, anchor_lbs
