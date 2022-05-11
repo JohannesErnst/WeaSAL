@@ -8,7 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #      Class handling Vaihingen dataset with weak region-labels.
-#      Implements a Dataset, a Sampler, and a collate_fn
+#      Implements a Dataset, a Sampler, and a collate function
 #      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
@@ -851,7 +851,6 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         data = read_ply(file_path)
         return np.vstack((data['x'], data['y'], data['z'])).T
 
-# Continue here jer
 
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -1134,7 +1133,7 @@ class Vaihingen3DWLSampler(Sampler):
             estim_b = 0
             target_b = self.dataset.config.batch_num
             
-            # Expected batch size order of magnitude
+            # Expected batch size order of magnitude        # there are some differences here but does that need to change? -jer
             expected_N = 20000
 
             # Calibration parameters. Higher means faster but can also become unstable
@@ -1192,11 +1191,11 @@ class Vaihingen3DWLSampler(Sampler):
 
                     # Save smooth errors for convergene check
                     smooth_errors.append(target_b - estim_b)
-                    if len(smooth_errors) > 30:
+                    if len(smooth_errors) > 10:                             # this was changed -jer
                         smooth_errors = smooth_errors[1:]
 
                     # Update batch limit with P controller
-                    self.dataset.batch_limit += Kp * error + Ki * error_I + Kd * error_D
+                    self.dataset.batch_limit += Kp * error + Ki * error_I + Kd * error_D        # this formula is different in Lin et al -jer
 
                     # Unstability detection
                     if not stabilized and self.dataset.batch_limit < 0:
@@ -1329,34 +1328,74 @@ class Vaihingen3DWLCustomBatch:
         # Get rid of batch dimension
         input_list = input_list[0]
 
-        # Number of layers
-        L = (len(input_list) - 7) // 5
-
-        # Extract input tensors from the list of numpy array
-        ind = 0
-        self.points = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
-        ind += L
-        self.neighbors = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
-        ind += L
-        self.pools = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
-        ind += L
-        self.upsamples = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
-        ind += L
-        self.lengths = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
-        ind += L
-        self.features = torch.from_numpy(input_list[ind])
-        ind += 1
-        self.labels = torch.from_numpy(input_list[ind])
-        ind += 1
-        self.scales = torch.from_numpy(input_list[ind])
-        ind += 1
-        self.rots = torch.from_numpy(input_list[ind])
-        ind += 1
-        self.cloud_inds = torch.from_numpy(input_list[ind])
-        ind += 1
-        self.center_inds = torch.from_numpy(input_list[ind])
-        ind += 1
-        self.input_inds = torch.from_numpy(input_list[ind])
+        if (len(input_list) - 12) % 5 == 0:                 # this part (the whole __init__) is really sus and probably need to change -jer
+            
+            L = (len(input_list) - 12) // 5 # L = (len(input_list) - 7) // 6
+    
+            # Extract input tensors from the list of numpy array
+            ind = 0
+            self.points = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+            ind += L
+            self.neighbors = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+            ind += L
+            self.pools = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+            ind += L
+            self.upsamples = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+            ind += L
+            self.lengths = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+            ind += L
+            self.features = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.labels = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.scales = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.rots = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.cloud_inds = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.center_inds = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.input_inds = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.cl_lb = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.cl_all_lb = torch.from_numpy(input_list[ind])            
+            ind += 1
+            self.region = input_list[ind]               # self.region never appears again... is necessary? -jer
+            ind += 1
+            self.region_lb = input_list[ind]  
+            ind += 1
+            self.center_pts = torch.from_numpy(input_list[ind])
+            
+        else:           
+            L = (len(input_list) - 7) // 5 # L = (len(input_list) - 7) // 6
+    
+            # Extract input tensors from the list of numpy array
+            ind = 0
+            self.points = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+            ind += L
+            self.neighbors = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+            ind += L
+            self.pools = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+            ind += L
+            self.upsamples = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+            ind += L
+            self.lengths = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+            ind += L
+            self.features = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.labels = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.scales = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.rots = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.cloud_inds = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.center_inds = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.input_inds = torch.from_numpy(input_list[ind])
 
         return
 
@@ -1377,7 +1416,11 @@ class Vaihingen3DWLCustomBatch:
         self.cloud_inds = self.cloud_inds.pin_memory()
         self.center_inds = self.center_inds.pin_memory()
         self.input_inds = self.input_inds.pin_memory()
-
+        self.cl_lb = self.cl_lb.pin_memory()
+        self.cl_all_lb =self.cl_lb.pin_memory()
+        if hasattr(self, 'center_pts'):    
+            self.center_pts = self.center_pts.pin_memory()
+        
         return self
 
     def to(self, device):
@@ -1394,7 +1437,11 @@ class Vaihingen3DWLCustomBatch:
         self.cloud_inds = self.cloud_inds.to(device)
         self.center_inds = self.center_inds.to(device)
         self.input_inds = self.input_inds.to(device)
-
+        self.cl_lb = self.cl_lb.to(device)
+        self.cl_all_lb =self.cl_lb.to(device)
+        if hasattr(self, 'center_pts'):
+            self.center_pts = self.center_pts.to(device)
+        
         return self
 
     def unstack_points(self, layer=None):

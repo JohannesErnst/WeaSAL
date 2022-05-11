@@ -8,6 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #      Define network blocks
+#      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -65,6 +66,7 @@ def gather(x, idx, method=2):
     else:
         raise ValueError('Unkown method')
 
+# Lin et al included index_normalize here but is never referenced -jer
 
 def radius_gaussian(sq_r, sig, eps=1e-9):
     """
@@ -450,13 +452,16 @@ class BatchNormBlock(nn.Module):
         nn.init.zeros_(self.bias)
 
     def forward(self, x):
-        if self.use_bn:
-
-            x = x.unsqueeze(2)
-            x = x.transpose(0, 2)
-            x = self.batch_norm(x)
-            x = x.transpose(0, 2)
-            return x.squeeze()
+        if self.use_bn: 
+            if len(x.shape) < 3:
+                x = x
+            else:             
+                x = x.unsqueeze(2)
+                x = x.transpose(0, 2)
+                x = self.batch_norm(x)
+                x = x.transpose(0, 2)
+                x.squeeze()
+            return x
         else:
             return x + self.bias
 
@@ -472,7 +477,7 @@ class UnaryBlock(nn.Module):
         """
         Initialize a standard unary block with its ReLU and BatchNorm.
         :param in_dim: dimension input features
-        :param out_dim: dimension input features
+        :param out_dim: dimension output features
         :param use_bn: boolean indicating if we use Batch Norm
         :param bn_momentum: Batch norm momentum
         """
@@ -509,7 +514,7 @@ class SimpleBlock(nn.Module):
         """
         Initialize a simple convolution block with its ReLU and BatchNorm.
         :param in_dim: dimension input features
-        :param out_dim: dimension input features
+        :param out_dim: dimension output features
         :param radius: current radius of convolution
         :param config: parameters
         """
@@ -560,13 +565,70 @@ class SimpleBlock(nn.Module):
         return self.leaky_relu(self.batch_norm(x))
 
 
+class SimpleBlock1(nn.Module):      # Do we realloy need both simpleBlocks? They only differ marginaly -jer
+
+    def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, config):
+        """
+        Initialize a simple convolution block with its ReLU and BatchNorm.
+        Uses (out_dim) instead of (out_dim // 2)
+        :param in_dim: dimension input features
+        :param out_dim: dimension output features
+        :param radius: current radius of convolution
+        :param config: parameters
+        """
+        super(SimpleBlock1, self).__init__()
+
+        # get KP_extent from current radius
+        current_extent = radius * config.KP_extent / config.conv_radius
+
+        # Get other parameters
+        self.bn_momentum = config.batch_norm_momentum
+        self.use_bn = config.use_batch_norm
+        self.layer_ind = layer_ind
+        self.block_name = block_name
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+
+        # Define the KPConv class
+        self.KPConv = KPConv(config.num_kernel_points,
+                             config.in_points_dim,
+                             in_dim,
+                             out_dim,
+                             current_extent,
+                             radius,
+                             fixed_kernel_points=config.fixed_kernel_points,
+                             KP_influence=config.KP_influence,
+                             aggregation_mode=config.aggregation_mode,
+                             deformable='deform' in block_name,
+                             modulated=config.modulated)
+
+        # Other opperations
+        self.batch_norm = BatchNormBlock(out_dim, self.use_bn, self.bn_momentum)
+        self.leaky_relu = nn.LeakyReLU(0.1)
+
+        return
+
+    def forward(self, x, batch):
+
+        if 'strided' in self.block_name:
+            q_pts = batch.points[self.layer_ind + 1]
+            s_pts = batch.points[self.layer_ind]
+            neighb_inds = batch.pools[self.layer_ind]
+        else:
+            q_pts = batch.points[self.layer_ind]
+            s_pts = batch.points[self.layer_ind]
+            neighb_inds = batch.neighbors[self.layer_ind]
+
+        x = self.KPConv(q_pts, s_pts, neighb_inds, x)
+        return self.leaky_relu(self.batch_norm(x))
+
 class ResnetBottleneckBlock(nn.Module):
 
     def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, config):
         """
         Initialize a resnet bottleneck block.
         :param in_dim: dimension input features
-        :param out_dim: dimension input features
+        :param out_dim: dimension output features
         :param radius: current radius of convolution
         :param config: parameters
         """
@@ -669,6 +731,7 @@ class NearestUpsampleBlock(nn.Module):
         """
         super(NearestUpsampleBlock, self).__init__()
         self.layer_ind = layer_ind
+        self.name_block = 'upsample'
         return
 
     def forward(self, x, batch):
@@ -692,3 +755,263 @@ class MaxPoolBlock(nn.Module):
     def forward(self, x, batch):
         return max_pool(x, batch.pools[self.layer_ind + 1])
 
+
+class spatial_att(nn.Module):
+
+    def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, config):
+        """
+        Initialize a spatial attention module.
+        :param in_dim: dimension input features
+        :param out_dim: dimension output features
+        :param radius: current radius of convolution
+        :param config: parameters
+        """
+        super(spatial_att, self).__init__()
+        
+        self.bn_momentum = config.batch_norm_momentum
+        self.use_bn = config.use_batch_norm
+        self.layer_ind = layer_ind
+        self.block_name = block_name
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        
+        # Combining blocks
+        self.simple1 = SimpleBlock1(block_name, in_dim, out_dim, radius, layer_ind, config)
+        self.unary1 = UnaryBlock(out_dim, out_dim // 8, self.use_bn, self.bn_momentum)
+        self.unary2 = UnaryBlock(out_dim, out_dim // 8, self.use_bn, self.bn_momentum)
+        self.unary3 = UnaryBlock(out_dim, out_dim, self.use_bn, self.bn_momentum)
+        self.gamma = Parameter(torch.zeros(1))
+        self.softmax = nn.Softmax(dim=-1)
+        self.simple2 = SimpleBlock1(block_name, in_dim, out_dim, radius, layer_ind, config)
+
+        return
+
+    def forward(self, features, batch):
+
+        # First downscaling mlp
+        features = self.simple1(features, batch)
+        x1 = self.unary1(features)
+        x2 = self.unary2(features)
+        x3 = self.unary3(features)
+        
+        start_ind=0
+        batch_inds_0 = 0
+        x = torch.zeros(0,features.shape[1]).cuda()
+        xn = torch.zeros(0,features.shape[1]).cuda()
+        stacked_length = batch.lengths[self.layer_ind]
+        
+        for ii in range(len(stacked_length)):
+            end_ind = start_ind + stacked_length[ii]
+            query = x1[start_ind:end_ind]
+            key = x2[start_ind:end_ind]
+            value = x3[start_ind:end_ind]            
+            key = key.T
+            energy = torch.matmul(query, key)
+            att = self.softmax(energy)
+            att = torch.matmul(att, value)
+            att_n = att / (stacked_length[ii].float())
+            x = torch.cat([x, att], 0)
+            xn = torch.cat([xn, att_n], 0)
+            start_ind = end_ind
+            batch_inds_0 += 1            
+
+        shortcut = features
+        merged = self.gamma * x + shortcut        
+        merged = self.simple2(merged, batch)
+
+        return merged, xn
+
+
+class channel_att_new2(nn.Module):      # rename this once you know where it is referenced -jer
+
+    def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, config):
+        """
+        Initialize a channel attention module.
+        :param in_dim: dimension input features
+        :param out_dim: dimension output features
+        :param radius: current radius of convolution
+        :param config: parameters
+        """
+        super(channel_att_new2, self).__init__()
+
+        self.bn_momentum = config.batch_norm_momentum
+        self.use_bn = config.use_batch_norm
+        self.layer_ind = layer_ind
+        self.block_name = block_name
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        
+        # Combining blocks
+        self.simple1 = SimpleBlock1(block_name, in_dim, out_dim // 8, radius, layer_ind, config)
+        self.unary1 = UnaryBlock(out_dim // 8, out_dim // 8, self.use_bn, self.bn_momentum)
+        self.unary2 = UnaryBlock(out_dim // 8, out_dim // 8, self.use_bn, self.bn_momentum)
+        self.gamma = Parameter(torch.zeros(1))
+        self.softmax = nn.Softmax(dim=-1)
+        self.simple2 = SimpleBlock1(block_name, out_dim // 8, out_dim, radius, layer_ind, config)
+
+        return
+
+    def forward(self, features, batch):
+
+        # First downscaling mlp
+        features = self.simple1(features, batch)
+        x1 = self.unary1(features)
+        x2 = self.unary2(features)
+        
+        start_ind=0
+        batch_inds_0 = 0
+        x = torch.zeros(0,features.shape[1]).cuda()
+        stacked_length = batch.lengths[self.layer_ind]
+        for ii in range(len(stacked_length)):
+            end_ind = start_ind + stacked_length[ii]
+            query = x1[start_ind:end_ind]
+            key = x2[start_ind:end_ind]
+            value = features[start_ind:end_ind]            
+            query = query.T
+            energy = torch.matmul(query, key)
+            energy_new = torch.max(energy, -1, keepdim=True)[0].expand_as(energy)-energy
+            att = self.softmax(energy_new)
+            att = torch.matmul(value, att)
+            x = torch.cat([x, att], 0)
+            start_ind = end_ind
+            batch_inds_0 += 1            
+
+        shortcut = features
+        merged = self.gamma * x + shortcut        
+        merged = self.simple2(merged, batch)
+
+        return merged
+
+
+class dual_att(nn.Module):          # Is this the point-wise attention module? Pretty sure it is, compare with KPFCNN_mprm forward pass but don't rename -jer
+
+    def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, config):
+        """
+        Initialize a dual attention module.
+        :param in_dim: dimension input features
+        :param out_dim: dimension output features
+        :param radius: current radius of convolution
+        :param config: parameters
+        """
+        super(dual_att, self).__init__()
+
+        self.bn_momentum = config.batch_norm_momentum
+        self.use_bn = config.use_batch_norm
+        self.layer_ind = layer_ind
+        self.block_name = block_name
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+
+        # Combining blocks
+        fdim = config.num_classes
+        self.sa_f = spatial_att(block_name, in_dim, out_dim, radius, layer_ind, config)
+        self.ca_f = channel_att_new2(block_name, in_dim, out_dim, radius, layer_ind, config)
+        self.simple1 = SimpleBlock1(block_name, in_dim+out_dim, out_dim, radius, layer_ind, config)
+        self.sa_unary = UnaryBlock(out_dim, fdim, self.use_bn, self.bn_momentum)
+        self.ca_unary = UnaryBlock(out_dim, fdim, self.use_bn, self.bn_momentum)
+        self.no_unary = UnaryBlock(in_dim, fdim, self.use_bn, self.bn_momentum)
+        self.psa_unary = UnaryBlock(out_dim, fdim, self.use_bn, self.bn_momentum)
+        
+        self.drop = config.use_dropout
+        if self.drop:
+            self.droplayer = nn.Dropout(p=config.use_dropout)
+
+
+    def forward(self, features, batch):
+
+        sa, sa_x = self.sa_f(features, batch)
+        ca = self.ca_f(features, batch)
+        psa = torch.cat((features, sa_x), dim=1)
+        psa = self.simple1(psa, batch)
+            
+        sa_u = self.sa_unary(sa, batch)
+        ca_u = self.ca_unary(ca, batch)
+        no_u = self.no_unary(features, batch)
+        psa_u = self.psa_unary(psa, batch)
+
+        return sa_u, ca_u, no_u, psa_u
+
+
+class global_average_block(nn.Module):
+
+    def __init__(self, block_name, in_dim, out_dim, layer_ind, config):
+        """
+        Initialize a global average block.
+        :param in_dim: dimension input features
+        :param out_dim: dimension input features
+        :param config: parameters
+        """
+        super(global_average_block, self).__init__()
+
+        self.bn_momentum = config.batch_norm_momentum
+        self.use_bn = config.use_batch_norm
+        self.layer_ind = layer_ind
+        self.block_name = block_name
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        return
+
+    def forward(self, features, batch):
+        
+        stacked_length = batch.lengths[self.layer_ind]
+        features = global_average(features, stacked_length)        
+        
+        return features
+
+
+class ele_att(nn.Module):
+
+    def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, config):
+        """
+        Initialize an elevation attention module.
+        :param in_dim: dimension input features
+        :param out_dim: dimension input features
+        :param radius: current radius of convolution
+        :param config: parameters
+        """
+        super(ele_att, self).__init__()
+
+        self.bn_momentum = config.batch_norm_momentum
+        self.use_bn = config.use_batch_norm
+        self.layer_ind = layer_ind
+        self.block_name = block_name
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        
+        # Combining blocks
+        self.unary1 = UnaryBlock(in_dim, out_dim, self.use_bn, self.bn_momentum)
+        self.unary2 = UnaryBlock(in_dim, out_dim, self.use_bn, self.bn_momentum)
+        self.gamma = Parameter(torch.zeros(1))
+        self.softmax = nn.Softmax(dim=-1)
+        self.simple2 = SimpleBlock1(block_name, out_dim, out_dim, radius, layer_ind, config)
+        return
+
+    def forward(self, features, h, batch):
+        
+        start_ind=0
+        batch_inds_0 = 0
+        x = torch.zeros(0,features.shape[1]).cuda()
+        stacked_length = batch.lengths[self.layer_ind]
+        for ii in range(len(stacked_length)):
+            end_ind = start_ind + stacked_length[ii]
+            o_z = batch.center_pts[ii][-1]
+            hh = h[start_ind:end_ind]  
+            ele_f = torch.stack((hh, hh+o_z), dim=-1).squeeze(1)
+            
+            query = self.unary1(ele_f)
+            key = self.unary2(ele_f)
+            value = features[start_ind:end_ind]            
+            query = query.T
+            energy = torch.matmul(query, key)
+
+            att = self.softmax(energy)
+            att = torch.matmul(value, att)
+            x = torch.cat([x, att], 0)
+            start_ind = end_ind
+            batch_inds_0 += 1            
+
+        shortcut = features
+        merged = self.gamma * x + shortcut        
+        merged = self.simple2(merged, batch)
+
+        return merged

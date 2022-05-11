@@ -7,14 +7,13 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Callable script to start a training on ModelNet40 dataset
+#      Callable script to visualize deformations on various datasets
+#      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #      Hugues THOMAS - 06/03/2020
 #
-
-
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #           Imports and global variables
@@ -29,8 +28,7 @@ import sys
 import torch
 
 # Dataset
-from datasets.ModelNet40 import *
-from datasets.S3DIS import *
+from datasets.Vaihingen3D_WeakLabel import *
 from torch.utils.data import DataLoader
 
 from utils.config import Config
@@ -154,14 +152,15 @@ if __name__ == '__main__':
     print('****************')
 
     # Initiate dataset
-    if config.dataset.startswith('ModelNet40'):
-        test_dataset = ModelNet40Dataset(config, train=False)
-        test_sampler = ModelNet40Sampler(test_dataset)
-        collate_fn = ModelNet40Collate
-    elif config.dataset == 'S3DIS':
-        test_dataset = S3DISDataset(config, set='validation', use_potentials=True)
-        test_sampler = S3DISSampler(test_dataset)
-        collate_fn = S3DISCollate
+    if config.dataset.startswith('Vaihingen3DWL'):
+        test_dataset = Vaihingen3DWLDataset(config, train=False)
+        test_sampler = Vaihingen3DWLSampler(test_dataset)
+        collate_fn = Vaihingen3DWLCollate
+    elif config.dataset == 'DALES':     # finish this -jer
+        # test_dataset = S3DISDataset(config, set='validation', use_potentials=True)
+        # test_sampler = S3DISSampler(test_dataset)
+        # collate_fn = S3DISCollate
+        raise ValueError('Not implemented yet')
     else:
         raise ValueError('Unsupported dataset : ' + config.dataset)
 

@@ -8,7 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #      Class handling Vaihingen dataset.
-#      Implements a Dataset, a Sampler, and a collate_fn
+#      Implements a Dataset, a Sampler, and a collate function
 #      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
