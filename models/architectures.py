@@ -464,7 +464,9 @@ class KPFCNN(nn.Module):
             mask_certaion = certain_label_slc.unsqueeze(0) == certain_label.unsqueeze(-1) 
             
             pos_mask = pseudo_label_slc.unsqueeze(0) == pseudo_lbs.unsqueeze(-1) * mask1 * mask_certaion
-            outputs = F.normalize(outputs, dim=1)               # what is F? Maybe this should be nn.functionals.normalize -jer
+            # outputs = F.normalize(outputs, dim=1)               # what is F? Maybe this should be nn.functionals.normalize -jer
+            outputs = nn.functionals.normalize.normalize(outputs, dim=1)    
+            exit("Stop, once the code reaches this part double check the F.normalize part. Does it work (in Stefans code)? -jer")
             x_slc = outputs[slc_idx]
             
             mul = torch.div(
