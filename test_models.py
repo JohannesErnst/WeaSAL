@@ -32,7 +32,7 @@ from datasets.Vaihingen3D import *
 from torch.utils.data import DataLoader
 
 from utils.config import Config
-from utils.tester import ModelTester
+from utils.tester_WeakLabel import ModelTester
 from models.architectures import KPCNN, KPFCNN
 
 

@@ -29,7 +29,7 @@ from datasets.Vaihingen3D import *
 from torch.utils.data import DataLoader
 
 from utils.config import Config
-from utils.trainer import ModelTrainer
+from utils.trainer_WeakLabel import ModelTrainer
 from models.architectures import KPFCNN
 
 

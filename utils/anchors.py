@@ -49,8 +49,9 @@ def get_anchors(points, in_radius, xyz_offset=[0,0,0], method='full'):
                 for z in z_num:
                     n_anchors.append([x, y, z])
 
-    # Remove this?? jer
-    # elif method=='reduce1':               
+    # Remove this?? -jer
+    elif method=='reduce1':      
+        exit("Stop -jer")         
     #     x_step = np.floor((x_max - x_min) / (2*in_radius)) + 1
     #     y_step = np.floor((y_max - y_min) / (2*in_radius)) + 1
     #     z_step = np.floor((z_max - z_min) / (2*in_radius)) + 1  
