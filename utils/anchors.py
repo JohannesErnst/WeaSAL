@@ -37,7 +37,7 @@ def get_anchors(points, in_radius, xyz_offset=[0,0,0], method='full'):
     z_min = points[:, 2].min()
 
     # Find regularly spaced anchor positions 
-    if method=='full':
+    if method == 'full':
         x_step = np.floor((x_max - x_min) / in_radius) + 1
         y_step = np.floor((y_max - y_min) / in_radius) + 1
         z_step = np.floor((z_max - z_min) / in_radius) + 1  
@@ -49,22 +49,23 @@ def get_anchors(points, in_radius, xyz_offset=[0,0,0], method='full'):
                 for z in z_num:
                     n_anchors.append([x, y, z])
 
-    # Remove this?? -jer
-    elif method=='reduce1':      
-        exit("Stop -jer")         
-    #     x_step = np.floor((x_max - x_min) / (2*in_radius)) + 1
-    #     y_step = np.floor((y_max - y_min) / (2*in_radius)) + 1
-    #     z_step = np.floor((z_max - z_min) / (2*in_radius)) + 1  
-    #     x_num = np.linspace(x_min, x_max, x_step.astype('int'))+xyz_offset[0]
-    #     y_num = np.linspace(y_min, y_max, y_step.astype('int'))+xyz_offset[1]
-    #     z_num = np.linspace(z_min, z_max, z_step.astype('int'))+xyz_offset[2]
-    #     for x in x_num:
-    #         for y in y_num:
-    #             for z in z_num:
-    #                 n_anchors.append([x, y, z])
-    #                 n_anchors.append([x, y, z+in_radius])
-    #                 n_anchors.append([x+in_radius, y+in_radius, z])
-    #                 n_anchors.append([x+in_radius, y+in_radius, z+in_radius])
+    # what exactly is the difference between reduce1 and full? Look at image created in blender. 
+    # generally you want to find a good compromise between number of weak labels and performance.
+    # reduce1 just uses lesse weak labels. Might experiment with this and rename at some point -jer
+    elif method == 'reduce1':          
+        x_step = np.floor((x_max - x_min) / (2*in_radius)) + 1
+        y_step = np.floor((y_max - y_min) / (2*in_radius)) + 1
+        z_step = np.floor((z_max - z_min) / (2*in_radius)) + 1  
+        x_num = np.linspace(x_min, x_max, x_step.astype('int'))+xyz_offset[0]
+        y_num = np.linspace(y_min, y_max, y_step.astype('int'))+xyz_offset[1]
+        z_num = np.linspace(z_min, z_max, z_step.astype('int'))+xyz_offset[2]
+        for x in x_num:
+            for y in y_num:
+                for z in z_num:
+                    n_anchors.append([x, y, z])
+                    n_anchors.append([x, y, z + in_radius])
+                    n_anchors.append([x + in_radius, y + in_radius, z])
+                    n_anchors.append([x + in_radius, y + in_radius, z + in_radius])
                  
                     
     return np.array(n_anchors)

@@ -20,6 +20,8 @@
 #       \**********************************/
 #
 
+# I think this is a script for showing the deformaable kernels. But double check. Do i even need this? -jer
+
 # Common libs
 import signal
 import os

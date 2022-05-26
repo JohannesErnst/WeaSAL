@@ -411,9 +411,9 @@ class Config:
                 text_file.write('model_name = {:s}\n'.format(self.model_name))
             if hasattr(self, 'loss_type'):                          # check the following hasattr whether to delete -jer
                 text_file.write('loss_type = {:s}\n'.format(self.loss_type))       
-            if hasattr(self, 'contrast_start'):                     # defines when (after how many epochs) we start using contrastive loss. Maybe keep this
+            if hasattr(self, 'contrast_start'):                     # defines when (after how many epochs) we start using contrastive loss. Maybe keep this -jer
                 text_file.write('contrast_start = {:.6f}\n'.format(self.contrast_start))      
-            if hasattr(self, 'contrast_thd'):
+            if hasattr(self, 'contrast_thd'):                       # this is contrast threshold, also importantn -jer
                 text_file.write('contrast_thd = {:.6f}\n'.format(self.contrast_thd))                   
             if hasattr(self, 'heads'):
                 text_file.write('heads = {:s}\n'.format(self.heads))              
@@ -421,8 +421,8 @@ class Config:
                 text_file.write('anchor_method = {:s}\n'.format(self.anchor_method))                   
             if hasattr(self, 'grad_method'):
                 text_file.write('grad_method = {:s}\n'.format(self.grad_method))                    
-            if hasattr(self, 'optopt'):
-                text_file.write('optopt = {:s}\n'.format(self.optopt))                    
+            # if hasattr(self, 'optopt'):           # delet eventually -jer
+            #     text_file.write('optopt = {:s}\n'.format(self.optopt))                    
             if hasattr(self, 'ck'):
                 text_file.write('ck = {:s}\n'.format(self.ck))     
             if hasattr(self, 'model_n'):

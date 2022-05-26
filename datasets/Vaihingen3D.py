@@ -405,7 +405,7 @@ class Vaihingen3DDataset(PointCloudDataset):
         scales = np.array(s_list, dtype=np.float32)
         rots = np.stack(R_list, axis=0)
 
-        # Input features (5 means [ones  r  g  b  height])
+        # Input features (4 means [ones  intensity absoluteHeight reducedHeight]) double check and clean next lines -jer
         stacked_features = np.ones_like(stacked_points[:, :1], dtype=np.float32)
         if self.config.in_features_dim == 1:
             pass
@@ -598,7 +598,7 @@ class Vaihingen3DDataset(PointCloudDataset):
         scales = np.array(s_list, dtype=np.float32)
         rots = np.stack(R_list, axis=0)
 
-        # Input features (5 means [ones  r  g  b  height])
+        # Input features (4 means [ones  intensity absoluteHeight reducedHeight]) double check and clean next lines -jer
         stacked_features = np.ones_like(stacked_points[:, :1], dtype=np.float32)
         if self.config.in_features_dim == 1:
             pass

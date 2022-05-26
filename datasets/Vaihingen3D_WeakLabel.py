@@ -507,7 +507,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         rots = np.stack(R_list, axis=0)
         cen_pts = np.concatenate(cen_list, axis=0).astype('float32')
 
-        # Input features (5 means [ones  r  g  b  height])
+        # Input features (4 means [ones  intensity absoluteHeight reducedHeight]) double check and clean next lines -jer
         stacked_features = np.ones_like(stacked_points[:, :1], dtype=np.float32)
         if self.config.in_features_dim == 1:
             pass
