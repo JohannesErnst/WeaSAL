@@ -2,3 +2,7 @@
 data/
 results/
 test/
+__pycache__/
+
+# C extensions
+*.so
