@@ -131,7 +131,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         # Prepare ply files
         ###################
 
-        # self.prepare_Vaihingen3DWL_ply()   # jer
+        self.prepare_Vaihingen3DWL_ply()
 
         ################
         # Load ply files
@@ -186,11 +186,6 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         self.batch_limit.share_memory_()
 
         # Define anchors (i.e. subregions of point cloud)
-        # I think next 3 lines are unnecessary -jer
-        if not hasattr(self, 'anchors'):
-            self.anchors = []
-            self.anchor_dicts = []
-
         self.anchors = [] 
         self.anchor_dicts = []
         self.anchor_trees = [] 
@@ -199,15 +194,12 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             points = np.array(tree.data)
             anchor = get_anchors(
                 points, config.sub_radius, xyz_offset=config.xyz_offset, method=config.anchor_method)
-            anchor, anchor_tree, anchors_dict, achor_lb = anchors_part_lbs(
+            anchor, anchor_tree, anchors_dict, achor_lb = anchors_with_points(
                 tree, anchor, self.input_labels[i], config.sub_radius, config.num_classes)
 
             # Update subregion information according to overlaps
             anchor, anchor_tree, anchors_dict, achor_lb = update_anchors(
                 tree, anchor, anchor_tree, anchors_dict, achor_lb, config.sub_radius)
-
-            # cls_lbs = part_class_lbs(anchors_dict, self.input_labels[i])  # delete? -jer
-            print('number of anchors: ', len(anchors_dict.keys()))
 
             self.anchors += [anchor]
             self.anchor_dicts += [anchors_dict]

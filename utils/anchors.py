@@ -7,9 +7,9 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Script for processing anchors (i.e. origin points of spherical subclouds) for
-#      the Vaihingen3D dataset with weak region-labels
-#      - adapted by Johannes Ernst, 2022
+#      Script for processing anchors (i.e. origin points of spherical subclouds) 
+#      for weak region-labels
+#      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -70,40 +70,43 @@ def get_anchors(points, in_radius, xyz_offset=[0,0,0], method='full'):
                     
     return np.array(n_anchors)
 
-def remove_empty_anchors(input_tree, anchors, radius):
-    """
-    Return anchors (i.e. subregions) that have less than 3 points inside
-    Double check the > 2 part -jer
-    """
-    clean_anchors = []
-    for i in range(anchors.shape[0]):
-        # Collect number of points in subregion
-        center_point = anchors[i].reshape(1, -1)
-        input_inds = input_tree.query_radius(center_point, r=radius)[0]
-        n = input_inds.shape[0]         # check if n is actually number of points -jer
+# def remove_empty_anchors(input_tree, anchors, radius):
+#     """
+#     Return anchors (i.e. subregions) that have more than 3 points inside
+#     I think this function is actually never used. remove if never used -jer
+#     """
+#     clean_anchors = []
+#     for i in range(anchors.shape[0]):
 
-        # Save anchors with less than 3 points
-        if n>2 :
-            clean_anchors += [anchors[i]]
+#         # Collect number of points in subregion
+#         center_point = anchors[i].reshape(1, -1)
+#         input_inds = input_tree.query_radius(center_point, r=radius)[0]
+#         n = input_inds.shape[0]
 
-    return np.array(clean_anchors)
+#         # Save anchors with more than 3 points
+#         if n > 2 :
+#             clean_anchors += [anchors[i]]
 
-def anchors_part_lbs(input_tree, anchors, lbs, radius, n_class=9):
+#     return np.array(clean_anchors)
+
+def anchors_with_points(input_tree, anchors, lbs, radius, n_class):
+    # This was once named anchors_part_lbs. Just fyi when trying to find the function -jer
     """
-    Return anchors (i.e. subregions) that have no points inside
+    Return anchors (i.e. subregions) that have points inside
     """
     clean_anchors = []
     anchors_dict = dict()
     anchor_lbs = dict()
     cc = 0
     for i in range(anchors.shape[0]):
+
         # Collect number of points in subregion
         center_point = anchors[i].reshape(1, -1)
         input_inds = input_tree.query_radius(center_point, r=radius)[0]
         n = input_inds.shape[0]
 
-        # Save anchors with no points 
-        if n>0 :
+        # Save anchors with points 
+        if n > 0 :
             clean_anchors += [anchors[i]]
             anchors_dict[cc] = [[input_inds], [anchors[i]]]
             slc_lbs = lbs[input_inds]
@@ -122,14 +125,14 @@ def update_anchors(input_tree, clean_anchors, anchor_tree, anchors_dict, anchor_
     Update anchors (i.e. subregions) and labels according to overlap
     """
     cc = len(anchors_dict.keys())
-    print(cc)
-    all_cc = 0
     points = np.array(input_tree.data)
+    print('Updating anchors:')
+    print('Anchors without considering overlap: {:.0f}'.format(cc))
 
-    # Search neighbouring points
+    # Search neighbouring anchors
     anchor_nei_idx, dists = anchor_tree.query_radius(clean_anchors,
-                                            r=1.5*sub_radius,
-                                            return_distance=True)    
+                                                     r = 1.5*sub_radius,
+                                                     return_distance = True)    
                                             
     # For all anchors
     for idx in range(len(anchor_nei_idx)):
@@ -145,19 +148,15 @@ def update_anchors(input_tree, clean_anchors, anchor_tree, anchors_dict, anchor_
                 continue              
             new_idxs = i_idxs[overlap]
     
-            # If two subregions have different class labels
+            # If two subregions have different class labels 
+            # store new anchors and its label
             if (anchor_lbs[idx] != anchor_lbs[nei]).sum() > 0:
-                # Store new anchors and its label
                 new_anchor = np.mean(points[new_idxs], axis=0)
                 anchors_dict[cc] = [[new_idxs], [new_anchor]]
                 anchor_lbs[cc] = anchor_lbs[idx] * anchor_lbs[nei]
                 clean_anchors = np.vstack((clean_anchors, np.expand_dims(new_anchor, axis=0)))
-                
-                all_cc = all_cc + anchor_lbs[cc]
-                
                 cc = cc+1
                 
-    print(cc)
-    print(all_cc)
+    print('Anchors considering overlaps: {:.0f}\n'.format(cc))      # maybe remove this at some point -jer
     anchor_tree = KDTree(clean_anchors, leaf_size=10)
     return clean_anchors, anchor_tree, anchors_dict, anchor_lbs

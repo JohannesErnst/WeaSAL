@@ -912,9 +912,9 @@ class dual_att(nn.Module):          # Is this the point-wise attention module? P
         self.no_unary = UnaryBlock(in_dim, fdim, self.use_bn, self.bn_momentum)
         self.psa_unary = UnaryBlock(out_dim, fdim, self.use_bn, self.bn_momentum)
         
-        self.drop = config.use_dropout
-        if self.drop:
-            self.droplayer = nn.Dropout(p=config.use_dropout)
+        self.dropout = config.dropout
+        if self.dropout:
+            self.droplayer = nn.Dropout(p=config.dropout)
 
 
     def forward(self, features, batch):

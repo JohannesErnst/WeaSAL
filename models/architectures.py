@@ -497,7 +497,7 @@ class KPFCNN(nn.Module):
 
 class KPFCNN_mprm(nn.Module):
     """
-    Class defining KPFCNN for weak labels (multi-path region mining)
+    Class defining KPFCNN for weak labels with multi-path region mining (mprm)
     """
 
     def __init__(self, config, lbl_values, ign_lbls):
@@ -540,7 +540,7 @@ class KPFCNN_mprm(nn.Module):
                 self.encoder_skip_dims.append(in_dim)
 
             # Detect upsampling block to stop
-            if 'atention' in block:         # shouldn't this be 'attention'? -jer
+            if 'attention' in block:
                 break            
             if 'upsample' in block:
                 break
@@ -567,10 +567,10 @@ class KPFCNN_mprm(nn.Module):
                 out_dim *= 2
         
         self.multi_att = dual_att('attention', out_dim, out_dim, r, layer, config)
-        self.no_ga = global_average_block('ga1', config.num_classes, config.num_classes, r, layer, config)
-        self.da_ga = global_average_block('ga2', config.num_classes, config.num_classes, r, layer, config)
-        self.spa_ga = global_average_block('ga3', config.num_classes, config.num_classes, r, layer, config)
-        self.cha_ga = global_average_block('ga4', config.num_classes, config.num_classes, r, layer, config)
+        self.no_ga = global_average_block('ga1', config.num_classes, config.num_classes, layer, config)
+        self.da_ga = global_average_block('ga2', config.num_classes, config.num_classes, layer, config)
+        self.spa_ga = global_average_block('ga3', config.num_classes, config.num_classes, layer, config)
+        self.cha_ga = global_average_block('ga4', config.num_classes, config.num_classes, layer, config)
         
 
         #####################
@@ -902,7 +902,7 @@ class KPFCNN_mprm_ele(KPFCNN_mprm):
                 self.encoder_skip_dims.append(in_dim)
 
             # Detect upsampling block to stop
-            if 'atention' in block:
+            if 'attention' in block:
                 break            
             if 'upsample' in block:
                 break
@@ -930,10 +930,10 @@ class KPFCNN_mprm_ele(KPFCNN_mprm):
 
         self.multi_att = dual_att('attention', out_dim, out_dim, r, layer, config)
         self.ele_head = ele_att('ele_attention', 2, out_dim, r, layer, config)          # this is the important part, just to find it quickly later -jer
-        self.no_ga = global_average_block('ga1', config.num_classes, config.num_classes, r, layer, config)
-        self.da_ga = global_average_block('ga2', config.num_classes, config.num_classes, r, layer, config)
-        self.spa_ga = global_average_block('ga3', config.num_classes, config.num_classes, r, layer, config)
-        self.cha_ga = global_average_block('ga4', config.num_classes, config.num_classes, r, layer, config)
+        self.no_ga = global_average_block('ga1', config.num_classes, config.num_classes, layer, config)
+        self.da_ga = global_average_block('ga2', config.num_classes, config.num_classes, layer, config)
+        self.spa_ga = global_average_block('ga3', config.num_classes, config.num_classes, layer, config)
+        self.cha_ga = global_average_block('ga4', config.num_classes, config.num_classes, layer, config)
         
         #####################
         # List Decoder blocks
@@ -976,7 +976,7 @@ class KPFCNN_mprm_ele(KPFCNN_mprm):
                 r *= 0.5
                 out_dim = out_dim // 2
 
-    def forward(self, batch, config): # 'no_sa_psa_ele'
+    def forward(self, batch, config):
 
         # Get input features
         x = batch.features.clone().detach()

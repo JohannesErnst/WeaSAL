@@ -7,7 +7,8 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Callable script to start a training with weak region-labels on Vaihingen3D dataset
+#      Callable script to start a training with weak region-labels on Vaihingen3D dataset.
+#      This is based on the multi-path region mining (mprm) approach.
 #      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
@@ -60,7 +61,7 @@ class Vaihingen3DConfig(Config):
     dataset_task = ''
 
     # Number of CPU threads for the input pipeline
-    input_threads = 10      # if crashing, set this to 6. Maybe is even faster with 6, needs testing -jer
+    input_threads = 10
 
     #########################
     # Architecture definition
@@ -166,28 +167,15 @@ class Vaihingen3DConfig(Config):
     # Enable dropout
     dropout = 0.5
 
+    # Other parameters
+    model_name = 'KPFCNN_mprm' 
+    loss_type = 'region_mprm_loss_any'
+    xyz_offset = [0, 0, 0]
+    anchor_method = 'reduce1'
+
     # Do we nee to save convergence
     saving = True
     saving_path = None
-
-    # Other parameters (double check which are needed -jer)
-    xyz_offset = [0, 0, 0]
-    edge_limit = 80             # dont think this is ever used -jer
-    agg_method = 'mean_mean'    # dont think this is ever used -jer
-    # previous_training_path = '' 
-    # chkp_idx = -1 
-    model_name = 'KPFCNN_mprm' 
-    loss_type = 'region_mprm_loss_any'  
-    contrast_start = 800
-    contrast_thd = 0.4
-    # heads = '' 
-    anchor_method = 'reduce1'
-    # grad_method = 'method2'
-    # optopt = 'sgd'
-    # use_pretrained = False
-    # pretxt = ''
-    use_dropout = 0
-
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -288,7 +276,7 @@ if __name__ == '__main__':
 
     # Define network model
     t1 = time.time()
-    if config.model_name == 'KPFCNN_mprm':          # rename mprm at some point -jer
+    if config.model_name == 'KPFCNN_mprm':
         net = KPFCNN_mprm(config, training_dataset.label_values, training_dataset.ignored_labels)
     elif config.model_name == 'KPFCNN_mprm_ele':
         net = KPFCNN_mprm_ele(config, training_dataset.label_values, training_dataset.ignored_labels) 

@@ -390,7 +390,7 @@ class Config:
             else:
                 text_file.write('epoch_steps = {:d}\n'.format(self.epoch_steps))
             text_file.write('validation_size = {:d}\n'.format(self.validation_size))
-            text_file.write('checkpoint_gap = {:d}\n'.format(self.checkpoint_gap))
+            text_file.write('checkpoint_gap = {:d}\n\n'.format(self.checkpoint_gap))
 
             # Other parameters
             text_file.write('# Other parameters\n')
@@ -411,9 +411,9 @@ class Config:
                 text_file.write('model_name = {:s}\n'.format(self.model_name))
             if hasattr(self, 'loss_type'):                          # check the following hasattr whether to delete -jer
                 text_file.write('loss_type = {:s}\n'.format(self.loss_type))       
-            if hasattr(self, 'contrast_start'):                     # defines when (after how many epochs) we start using contrastive loss. Maybe keep this -jer
+            if hasattr(self, 'contrast_start'):
                 text_file.write('contrast_start = {:.6f}\n'.format(self.contrast_start))      
-            if hasattr(self, 'contrast_thd'):                       # this is contrast threshold, also importantn -jer
+            if hasattr(self, 'contrast_thd'):
                 text_file.write('contrast_thd = {:.6f}\n'.format(self.contrast_thd))                   
             if hasattr(self, 'heads'):
                 text_file.write('heads = {:s}\n'.format(self.heads))              
