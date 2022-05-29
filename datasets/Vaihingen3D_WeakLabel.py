@@ -109,7 +109,8 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 
         # Define datasets and splits
         # self.cloud_names = ['Vaihingen3D_Traininig_train', 'Vaihingen3D_Traininig_val', 'Vaihingen3D_EVAL_WITH_REF']
-        self.cloud_names = ['Vaihingen3D_Traininig_val', 'Vaihingen3D_Traininig_val']
+        self.cloud_names = ['Vaihingen3D_Traininig_train', 'Vaihingen3D_Traininig_val']
+        # self.cloud_names = ['Vaihingen3D_Traininig_val', 'Vaihingen3D_Traininig_val']
         # self.all_splits = [0, 1, 2]
         self.all_splits = [0, 1]        # jer
         self.validation_split = 1
@@ -377,52 +378,37 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             input_inds = self.input_trees[cloud_ind].query_radius(center_point,
                                                                   r=self.config.in_radius)[0]
 
-            # Get subregion index
+            # Get anchor (i.e. subregion) index
             pot_anchor_tree = self.anchor_trees[cloud_ind]
             pot_anchor_dict = self.anchor_dicts[cloud_ind]
             pot_anchor_lb = self.anchor_lbs[cloud_ind]
 
-            # Search neighbouring anchors
+            # Search neighbouring anchors (i.e. anchors in input region)
             pot_anchor_inds, dists = pot_anchor_tree.query_radius(center_point,
                                                     r=self.config.in_radius-self.config.sub_radius-0.01,
                                                     return_distance=True)
 
-            # Chech this -jer
-            # t += [time.time()]
-            tt_re2 = time.time()
-
-            # Map the ids in the original point clouds to the selected point clouds (clean up next 20 lines -jer)
-            region_lb = []
-            region_idx = []
-            for aa in range(pot_anchor_inds[0].shape[0]):
-                pot_ans_idx = pot_anchor_inds[0][aa]        # get anchor id
-                idx_r = pot_anchor_dict[pot_ans_idx][0][0]  # get corresponding points id
-                tt_0 = time.time()
-                # idx0 = np.where(idx_r.reshape(idx_r.shape[0],1)==input_inds)[1]   # delete? -jer
-                x = input_inds
-                y = idx_r[np.in1d(idx_r,input_inds)] # if select a fix number of points as the input, some sub_cloud idx in the origional points may not in the 
-                xsorted = np.argsort(x)
-                ypos = np.searchsorted(x[xsorted], y) # all elements in y are in x
-                idx = xsorted[ypos]
-                
-                # if (idx!=idx0).sum()>0:
-                #     print('error!!')
-                    
-                # idx = np.where(idx_r[:, None] == input_inds[None, :])[1]
-                # print(time.time()-tt_0)
-                # assert input_inds.shape[0]>=np.max(idx), 'input error'# print('error: ', input_inds.shape[0], np.max(idx))
-                
-                region_idx.append(idx)
-                region_lb.append(pot_anchor_lb[pot_ans_idx])
-            # print(time.time()-tt_re2)
-            # print('region_time_cuda: ',tt_re2 - tt_re, 'region_time: ', time.time()-tt_re2)  
             t += [time.time()]
 
-            # Number collected
+            # Map the ids in the original point clouds to the points in the selected subregion
+            region_idx = []
+            region_lb = []
+            for aa in range(pot_anchor_inds[0].shape[0]):   # for all neighbouring anchors
+                pot_ans_idx = pot_anchor_inds[0][aa]        # get anchor id
+                idx_r = pot_anchor_dict[pot_ans_idx][0][0]  # get corresponding points id
+                y = idx_r[np.in1d(idx_r,input_inds)]        # filter out points that are in subregion but not input region
+                ii_sorted = np.argsort(input_inds)          # sorted input indices
+                ypos = np.searchsorted(input_inds[ii_sorted], y)
+                idx = ii_sorted[ypos]                       # indices of subregion points in original point cloud
+                region_idx.append(idx)
+                region_lb.append(pot_anchor_lb[pot_ans_idx])
+
+            t += [time.time()]
+
+            # Number of collected points in input region
             n = input_inds.shape[0]
 
             # What is this for? -jer
-            tt1 = time.time()
             if n < 2:
                 self.potentials[cloud_ind][point_ind] += 10
                 min_ind = torch.argmin(self.potentials[cloud_ind])

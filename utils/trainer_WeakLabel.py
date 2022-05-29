@@ -35,6 +35,9 @@ import sys
 # PLY reader
 from utils.ply import read_ply, write_ply
 
+# Confusion matrix function
+import utils.conf_matrix as conf_matrix
+
 # Metrics
 from utils.metrics import IoU_from_confusions, fast_confusion
 from utils.config import Config
@@ -519,10 +522,13 @@ class ModelTrainer:
                 # Add up confusions
                 labels = val_loader.dataset.validation_labels[i].astype(np.int32)
                 Confs += fast_confusion(labels, preds, val_loader.dataset.label_values).astype(np.int32)
-            
+
             # Save confusions
             c_path = join(val_path, 'conf.txt')
             np.savetxt(c_path, Confs, delimiter=' ', fmt='%i')
+            conf_matrix.plot(Confs, val_loader.dataset.label_to_names, val_path, 
+                             file_suffix=val_loader.dataset.cloud_names[0],
+                             abs_vals=False, F1=True, iou=True, show=False)
 
             # Remove ignored labels from confusions
             for l_ind, label_value in reversed(list(enumerate(val_loader.dataset.label_values))):

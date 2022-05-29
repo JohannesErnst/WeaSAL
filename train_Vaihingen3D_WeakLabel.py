@@ -145,13 +145,13 @@ class Vaihingen3DConfig(Config):
     batch_num = 2
 
     # Number of steps per epochs
-    epoch_steps = 600
+    epoch_steps = 100   # was 600, just for testing -jer
 
     # Number of validation examples per epoch
     validation_size = 50
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 10
+    checkpoint_gap = 1  # was 10, just for testing -jer
 
     # Augmentations
     augment_scale_anisotropic = True
