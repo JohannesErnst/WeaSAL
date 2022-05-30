@@ -774,7 +774,7 @@ class KPFCNN_mprm(nn.Module):
             # print('end_id: ', 'batch_lengths[ri]', end_id, batch_lengths[ri])
             logits = cam_all[:,star_id:end_id,:]
             
-            labels = labels_o[star_id:end_id] 
+            labels = labels_o[star_id:end_id]  # nremove this -jer 
             all_cls_lbs.append(np.stack(regions_lb[ri]).astype('float32'))
             for ii in range(len(regions)):
                 slc_dix = regions[ii].astype('int64') 

@@ -232,18 +232,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             self.epoch_i = 0
 
         else:
-            self.potentials = None
-            self.min_potentials = None
-            self.argmin_potentials = None
-            N = config.epoch_steps * config.batch_num
-            self.epoch_inds = torch.from_numpy(np.zeros((2, N), dtype=np.int64))
-            self.epoch_i = torch.from_numpy(np.zeros((1,), dtype=np.int64))
-            self.epoch_i.share_memory_()
-            self.epoch_inds.share_memory_()
-
-            self.potentials = []            # change this? -jer
-            self.min_potentials = []
-            self.argmin_potentials = []
+            raise NotImplementedError('Only potential selection is supported')
 
         self.worker_lock = Lock()
 
@@ -266,13 +255,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         The main thread gives a list of indices to load a batch. Each worker is going to work in parallel to load a
         different list of indices.
         """
-
-        # This part is unnecessary because there is only potential item here --> Regular picking strategy
-        # Delete at some point (but double check with inputs from train_.py)
-        if self.use_potentials:
-            return self.potential_item(batch_i)
-        else:
-            return self.random_item(batch_i)
+        return self.potential_item(batch_i)
 
     def potential_item(self, batch_i, debug_workers=False):
 
@@ -409,26 +392,28 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             n = input_inds.shape[0]
 
             # What is this for? -jer
+            # In original KPConv this is a safe check for empty spheres 
             if n < 2:
                 self.potentials[cloud_ind][point_ind] += 10
                 min_ind = torch.argmin(self.potentials[cloud_ind])
                 self.min_potentials[[cloud_ind]] = self.potentials[cloud_ind][min_ind]
                 self.argmin_potentials[[cloud_ind]] = min_ind   # find the new point with minimum potential
+                exit("Look at comment above -jer")
                 continue
 
-            # Collect weak labels and colors
+            # Collect weak cloud-labels and colors
             input_points = (points[input_inds] - center_point).astype(np.float32)
             input_colors = self.input_colors[cloud_ind][input_inds]
             if self.set in ['test', 'ERF']:
                 input_labels = np.zeros(input_points.shape[0])
             else:
-                input_labels = self.input_labels[cloud_ind][input_inds]
+                input_labels = self.input_labels[cloud_ind][input_inds] # collect all point labels
                 input_labels = np.array([self.label_to_idx[l] for l in input_labels])
-                cloud_labels_idx = np.unique(input_labels)
+                cloud_labels_idx = np.unique(input_labels)              # create weak cloud-label
                 cloud_labels = np.zeros((1, self.config.num_classes))
                 cloud_labels[0][cloud_labels_idx] = 1
                 cloud_labels_all = np.ones((len(input_labels), self.config.num_classes))
-                cloud_labels_all = cloud_labels_all * cloud_labels # expand cloud labels
+                cloud_labels_all = cloud_labels_all * cloud_labels      # apply weak label to all points in cloud
 
             t += [time.time()]
 
@@ -439,7 +424,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             if np.random.rand() > self.config.augment_color:
                 input_colors *= 0
 
-            # Get original height as additional feature (shoudln't this be unneccesary?? -jer)
+            # Get original height as additional feature
             input_features = np.hstack((input_colors, input_points[:, 2:] + center_point[:, 2:], input_points[:, 2:])).astype(np.float32)
 
             t += [time.time()]
@@ -466,8 +451,6 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             if batch_n > 1:
                 break
 
-        # Continue here -jer
-
         ###################
         # Concatenate batch
         ###################
@@ -485,7 +468,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         rots = np.stack(R_list, axis=0)
         cen_pts = np.concatenate(cen_list, axis=0).astype('float32')
 
-        # Input features (4 means [ones  intensity absoluteHeight reducedHeight]) double check and clean next lines -jer
+        # Input features (4 means [ones  intensity absoluteHeight reducedHeight])
         stacked_features = np.ones_like(stacked_points[:, :1], dtype=np.float32)
         if self.config.in_features_dim == 1:
             pass
@@ -493,10 +476,8 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             stacked_features = np.hstack((stacked_features, features[:, :1]))        
         elif self.config.in_features_dim == 4:
             stacked_features = np.hstack((stacked_features, features[:, :3]))
-        elif self.config.in_features_dim == 5:
-            stacked_features = np.hstack((stacked_features, features))
         else:
-            raise ValueError('Only accepted input dimensions are 1, 2, 4 and 5')
+            raise ValueError('Only accepted input dimensions are 1, 2 and 4')
 
         #######################
         # Create network inputs
@@ -506,7 +487,6 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         #
 
         t += [time.time()]
-        tt1=time.time()
 
         # Get the whole input list
         input_list = self.segmentation_inputs(stacked_points,
@@ -1022,7 +1002,7 @@ class Vaihingen3DWLSampler(Sampler):
         if self.dataset.use_potentials:
             sampler_method = 'potentials'
         else:
-            sampler_method = 'random'
+            raise NotImplementedError('Only potential selection is supported')
         key = '{:s}_{:.3f}_{:.3f}_{:d}'.format(sampler_method,
                                                self.dataset.config.in_radius,
                                                self.dataset.config.first_subsampling_dl,
@@ -1111,7 +1091,7 @@ class Vaihingen3DWLSampler(Sampler):
             estim_b = 0
             target_b = self.dataset.config.batch_num
             
-            # Expected batch size order of magnitude        # there are some differences here but does that need to change? -jer
+            # Expected batch size order of magnitude
             expected_N = 20000
 
             # Calibration parameters. Higher means faster but can also become unstable
@@ -1169,7 +1149,7 @@ class Vaihingen3DWLSampler(Sampler):
 
                     # Save smooth errors for convergene check
                     smooth_errors.append(target_b - estim_b)
-                    if len(smooth_errors) > 10:                             # this was changed -jer
+                    if len(smooth_errors) > 10:
                         smooth_errors = smooth_errors[1:]
 
                     # Update batch limit with P controller
@@ -1272,7 +1252,7 @@ class Vaihingen3DWLSampler(Sampler):
             if self.dataset.use_potentials:
                 sampler_method = 'potentials'
             else:
-                sampler_method = 'random'
+                raise NotImplementedError('Only potential selection is supported')
             key = '{:s}_{:.3f}_{:.3f}_{:d}'.format(sampler_method,
                                                    self.dataset.config.in_radius,
                                                    self.dataset.config.first_subsampling_dl,
@@ -1303,77 +1283,49 @@ class Vaihingen3DWLCustomBatch:
 
     def __init__(self, input_list):
 
-        # Get rid of batch dimension
+        # Get rid of batch dimension and check dimension
         input_list = input_list[0]
+        if not (len(input_list) - 12) % 5 == 0:
+            raise ValueError('Input list is incomplete for weak label training')
+            
+        # Number of layers
+        L = (len(input_list) - 12) // 5
 
-        if (len(input_list) - 12) % 5 == 0:                 # this part (the whole __init__) is really sus and probably need to change -jer
-            
-            L = (len(input_list) - 12) // 5 # L = (len(input_list) - 7) // 6
-    
-            # Extract input tensors from the list of numpy array
-            ind = 0
-            self.points = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
-            ind += L
-            self.neighbors = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
-            ind += L
-            self.pools = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
-            ind += L
-            self.upsamples = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
-            ind += L
-            self.lengths = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
-            ind += L
-            self.features = torch.from_numpy(input_list[ind])
-            ind += 1
-            self.labels = torch.from_numpy(input_list[ind])
-            ind += 1
-            self.scales = torch.from_numpy(input_list[ind])
-            ind += 1
-            self.rots = torch.from_numpy(input_list[ind])
-            ind += 1
-            self.cloud_inds = torch.from_numpy(input_list[ind])
-            ind += 1
-            self.center_inds = torch.from_numpy(input_list[ind])
-            ind += 1
-            self.input_inds = torch.from_numpy(input_list[ind])
-            ind += 1
-            self.cl_lb = torch.from_numpy(input_list[ind])
-            ind += 1
-            self.cl_all_lb = torch.from_numpy(input_list[ind])            
-            ind += 1
-            self.region = input_list[ind]               # self.region never appears again... is necessary? -jer
-            ind += 1
-            self.region_lb = input_list[ind]  
-            ind += 1
-            self.center_pts = torch.from_numpy(input_list[ind])
-            
-        else:           
-            L = (len(input_list) - 7) // 5 # L = (len(input_list) - 7) // 6
-    
-            # Extract input tensors from the list of numpy array
-            ind = 0
-            self.points = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
-            ind += L
-            self.neighbors = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
-            ind += L
-            self.pools = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
-            ind += L
-            self.upsamples = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
-            ind += L
-            self.lengths = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
-            ind += L
-            self.features = torch.from_numpy(input_list[ind])
-            ind += 1
-            self.labels = torch.from_numpy(input_list[ind])
-            ind += 1
-            self.scales = torch.from_numpy(input_list[ind])
-            ind += 1
-            self.rots = torch.from_numpy(input_list[ind])
-            ind += 1
-            self.cloud_inds = torch.from_numpy(input_list[ind])
-            ind += 1
-            self.center_inds = torch.from_numpy(input_list[ind])
-            ind += 1
-            self.input_inds = torch.from_numpy(input_list[ind])
+        # Extract input tensors from the list of numpy array
+        ind = 0
+        self.points = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+        ind += L
+        self.neighbors = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+        ind += L
+        self.pools = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+        ind += L
+        self.upsamples = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+        ind += L
+        self.lengths = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+        ind += L
+        self.features = torch.from_numpy(input_list[ind])
+        ind += 1
+        self.labels = torch.from_numpy(input_list[ind])
+        ind += 1
+        self.scales = torch.from_numpy(input_list[ind])
+        ind += 1
+        self.rots = torch.from_numpy(input_list[ind])
+        ind += 1
+        self.cloud_inds = torch.from_numpy(input_list[ind])
+        ind += 1
+        self.center_inds = torch.from_numpy(input_list[ind])
+        ind += 1
+        self.input_inds = torch.from_numpy(input_list[ind])
+        ind += 1
+        self.cl_lb = torch.from_numpy(input_list[ind])
+        ind += 1
+        self.cl_all_lb = torch.from_numpy(input_list[ind])            
+        ind += 1
+        self.region = input_list[ind]
+        ind += 1
+        self.region_lb = input_list[ind]  
+        ind += 1
+        self.center_pts = torch.from_numpy(input_list[ind])
 
         return
 
