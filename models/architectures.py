@@ -621,7 +621,7 @@ class KPFCNN_mprm(nn.Module):
         # List of valid labels (those not ignored in loss)
         self.valid_labels = np.sort([c for c in lbl_values if c not in ign_lbls])
 
-        # Choose segmentation loss          # clear this part up once it is running -jer
+        # Choose segmentation loss          # clear this part up once it is running. Might try to change this for better results though (look at original KPConv) -jer
         if len(config.class_w) > 0:
             class_w = torch.from_numpy(np.array(config.class_w, dtype=np.float32))
             self.criterion = torch.nn.CrossEntropyLoss(ignore_index=-1) #weight=class_w, 
@@ -653,7 +653,7 @@ class KPFCNN_mprm(nn.Module):
                 module.register_forward_hook(forward_hook)
                 module.register_backward_hook(backward_hook)
 
-    def forward(self, batch, config):       # talk about this with stefan. Also similar code in KPFCNN_mprm_ele -jer
+    def forward(self, batch, config):
 
         # Get input features
         x = batch.features.clone().detach()
@@ -724,7 +724,7 @@ class KPFCNN_mprm(nn.Module):
    
     def class_logits_loss(self, class_logits, cl_lb):
         """
-        Runs the BCEWithLogitsLoss on outputs of the model
+        Runs the BCEWithLogitsLoss (binary cross entropy) on outputs of the model
         :param class_logits: logits
         :param cl_lb: labels
         :return: loss
@@ -755,32 +755,34 @@ class KPFCNN_mprm(nn.Module):
         # Combined loss
         return self.output_loss1 + self.output_loss2 + self.output_loss3 + self.output_loss4 + self.reg_loss    
 
-    def region_mprm_loss_fast_any(self, cam, regions_all, regions_lb, batch_lengths, input_inds, labels_o, config):
-        # In trainer.py you can choose between "region_mprm_loss_fast_any" and "region_loss". However I think the latter is
-        # not implemented. Also: Not sure if this is the function they designed for the overlapping region loss
-        # Double check this when running and then update/clean the whole function -jer
+    def region_mprm_loss(self, cam, regions_all, regions_lb, batch_lengths):
+        """
+        Runs the overlap region loss on outputs of the model
+        :param cam: logits of attention modules (class activation map)
+        :param regions_all: indices of subregion points
+        :param regions_lb: weak labels of subregions
+        :param batch_lengths: batch lengths
+        :return: loss
+        """        
+
+        # Initilize parameters
         averaged_features = []
         all_cls_lbs = []
         self.output_loss = 0
         cam_all = torch.stack(cam, dim=0)
-        nn = len(cam)
-        # print('batch_lengths: ', batch_lengths)
-        # fast version
-        tt1 = time.time()
         star_id = 0
+
+        # Loop over all regions
         for ri in range(len(regions_all)):
             regions = regions_all[ri]
             end_id = star_id + batch_lengths[ri]
-            # print('end_id: ', 'batch_lengths[ri]', end_id, batch_lengths[ri])
             logits = cam_all[:,star_id:end_id,:]
             
-            labels = labels_o[star_id:end_id]  # nremove this -jer 
             all_cls_lbs.append(np.stack(regions_lb[ri]).astype('float32'))
             for ii in range(len(regions)):
                 slc_dix = regions[ii].astype('int64') 
                 slc_dix = torch.from_numpy(slc_dix).cuda()
-                # print('slc_dix: ', torch.max(slc_dix))
-                assert logits.shape[1]>=torch.max(slc_dix), 'logits problem'
+                assert logits.shape[1] >= torch.max(slc_dix), 'logits problem'
                 averaged_features.append(torch.mean(logits[:,slc_dix,:], dim=1))
 
             star_id = star_id + batch_lengths[ri]
@@ -788,15 +790,21 @@ class KPFCNN_mprm(nn.Module):
         all_cls_lbs = np.vstack(all_cls_lbs)
         all_cls_lbs = torch.from_numpy(all_cls_lbs).cuda()
         
+        # Stack features and calculate loss
         averaged_features = torch.stack(averaged_features)
         for ii in range(averaged_features.shape[1]):
-            # lll = self.criterion_multi(averaged_features[:,ii,:],all_cls_lbs)
             self.output_loss = self.output_loss + self.criterion_multi(averaged_features[:,ii,:],all_cls_lbs)
 
         return self.output_loss 
 
-    def accuracy(self, outputs, labels):        # These 3 accuracy functions are definitely sus. I think I only need one of them -jer
-        """                                     # I think accuracy_mprm is never used the other two have similar structre so just make into one? -jer
+    def accuracy(self, outputs, labels):        
+        # These 2 accuracy functions are definitely sus. I think I only need one of them. 
+        # First one is used for pseudo label and second one for weak label script. 
+        # Only difference is the dim = 1 / -1. 
+        # This only makes a difference when logits dimension is 3D then dim -1 gives the same 
+        # results as dim 2 and dim -2 goives the same result as dim 1... 
+        # Debug this once pseudo label is running -jer
+        """ 
         Computes accuracy of the current batch
         :param outputs: logits predicted by the network
         :param labels: labels
@@ -814,29 +822,10 @@ class KPFCNN_mprm(nn.Module):
 
         return correct / total
 
-    def accuracy_mprm(self, outputs, labels):
-        """
-        Computes accuracy of the current batch
-        :param outputs: logits predicted by the network
-        :param labels: labels
-        :return: accuracy value
-        """
-
-        # Set all ignored labels to -1 and correct the other label to be in [0, C-1] range
-        target = - torch.ones_like(labels)
-        for i, c in enumerate(self.valid_labels):
-            target[labels == c] = i
-
-        predicted = torch.argmax(outputs, dim=-1)
-        total = target.size(0)
-        correct = (predicted == target).sum().item()
-
-        return correct / total
-
     def accuracy_logits(self, logits, labels):
         """
         Computes accuracy of the current batch
-        :param outputs: logits predicted by the network
+        :param logits: logits predicted by the network
         :param labels: labels
         :return: accuracy value
         """
@@ -1005,9 +994,8 @@ class KPFCNN_mprm_ele(KPFCNN_mprm):
             dual_att = block_op(dual_att, batch)
             spa_att = block_op(spa_att, batch)
             cha_att = block_op(cha_att, batch)
-            # x = block_op(x, batch)
             
-        x = torch.max(no_att, dual_att)                         # Why did they switch the order of x and so on? -jer
+        x = torch.max(no_att, dual_att)
         x = torch.max(x, spa_att)
         x = torch.max(x, cha_att)
         

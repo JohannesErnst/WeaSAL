@@ -33,7 +33,7 @@ from os.path import join, exists
 from utils.ply import read_ply, write_ply
 from utils.config import bcolors
 
-# There are some changes here compared to Lin et al. but on a first glance should be irrelevant -jer
+# Small chnages here but should be irrelevant. If everything works just delete this comment. -jer
 # ------------------------------------------------------------------------------------------
 #
 #           Functions

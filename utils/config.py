@@ -403,10 +403,10 @@ class Config:
                 for a in self.xyz_offset:
                     text_file.write(' {:.6f}'.format(a))
             text_file.write('\n')
-            if hasattr(self, 'previous_training_path'):             # delete this? -jer
-                text_file.write('previous_training_path = {:s}\n'.format(self.previous_training_path))
-            if hasattr(self, 'chkp_idx'):                           # delete this? -jer
-                text_file.write('chkp_idx = {:.6f}\n'.format(self.chkp_idx))
+            # if hasattr(self, 'previous_training_path'):             # delete this? -jer
+            #     text_file.write('previous_training_path = {:s}\n'.format(self.previous_training_path))
+            # if hasattr(self, 'chkp_idx'):                           # delete this? -jer
+            #     text_file.write('chkp_idx = {:.6f}\n'.format(self.chkp_idx))
             if hasattr(self, 'model_name'):                         
                 text_file.write('model_name = {:s}\n'.format(self.model_name))
             if hasattr(self, 'loss_type'):                          # check the following hasattr whether to delete -jer

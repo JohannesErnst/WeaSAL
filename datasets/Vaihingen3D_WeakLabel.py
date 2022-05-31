@@ -1295,7 +1295,6 @@ class Vaihingen3DWLCustomBatch:
     def __init__(self, input_list):
 
         # Get rid of batch dimension and check dimension
-        # Debug this error where set is not available here -jer
         input_list = input_list[0]
         if len(input_list) == 27:
             L = (len(input_list) - 12) // 5     # number of layers for training/validation

@@ -145,13 +145,13 @@ class Vaihingen3DConfig(Config):
     batch_num = 2
 
     # Number of steps per epochs
-    epoch_steps = 600   # was 600, just for testing -jer
+    epoch_steps = 600
 
     # Number of validation examples per epoch
     validation_size = 50
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 10  # was 10, just for testing -jer
+    checkpoint_gap = 10
 
     # Augmentations
     augment_scale_anisotropic = True
@@ -168,8 +168,8 @@ class Vaihingen3DConfig(Config):
     dropout = 0.5
 
     # Other parameters
-    model_name = 'KPFCNN_mprm' 
-    loss_type = 'region_mprm_loss_any'
+    model_name = 'KPFCNN_mprm_ele'
+    loss_type = 'region_mprm_loss'
     xyz_offset = [0, 0, 0]
     anchor_method = 'reduce1'
 

@@ -188,9 +188,9 @@ if __name__ == '__main__':
     print('\nModel Preparation')
     print('*****************')
 
-    # Define network model
+    # Define network model (must match training network model)
     t1 = time.time()
-    config.model_name = 'KPFCNN_mprm'
+    config.model_name = 'KPFCNN_mprm_ele'
     if config.model_name == 'KPFCNN_mprm':
         net = KPFCNN_mprm(config, test_dataset.label_values, test_dataset.ignored_labels)
     elif config.model_name == 'KPFCNN_mprm_ele':

@@ -191,16 +191,11 @@ class ModelTrainer:
                 self.logits, self.class_logits, self.cam = net(batch, config)
 
                 # Classification loss and accuracy
-                if config.loss_type == 'region_loss':       # i think this is not implemented, maybe delete -jer
-                    loss = net.region_loss(
-                        self.logits, batch.region[0], batch.input_inds, batch.labels, config)
-                elif config.loss_type == 'region_mprm_loss_any':        # this should probably be renamed at some point -jer
-                    ttt = time.time()
-                    loss = net.region_mprm_loss_fast_any(
-                        self.cam, batch.region, batch.region_lb, batch.lengths[0], batch.input_inds, batch.labels, config)
+                if config.loss_type == 'region_mprm_loss':
+                    loss = net.region_mprm_loss(self.cam, batch.region, batch.region_lb, batch.lengths[0])
                 else:
                     loss = net.class_logits_loss(self.class_logits, batch.cl_lb)
-                acc = net.accuracy_logits(self.logits, batch.labels) 
+                acc = net.accuracy_logits(self.logits, batch.labels)
 
                 t += [time.time()]
 
