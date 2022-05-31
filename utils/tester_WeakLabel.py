@@ -67,7 +67,7 @@ class ModelTester:
         net.to(self.device)
 
         # What exactly does this do and is it necessary? also all other occurances of ck_name? -jer
-        self.ck_name = chkp_path.split('/')[-1].split('.tar')[0]
+        # self.ck_name = chkp_path.split('/')[-1].split('.tar')[0]
 
         ##########################
         # Load previous checkpoint
@@ -110,14 +110,14 @@ class ModelTester:
         # Test saving path
         if config.saving:
             test_path = join('test', config.saving_path.split('/')[-1])
-            if not exists(join(test_path, self.ck_name)):
-                makedirs(join(test_path, self.ck_name))
-            if not exists(join(test_path, self.ck_name, 'predictions')):
-                makedirs(join(test_path, self.ck_name, 'predictions'))
-            if not exists(join(test_path,self.ck_name, 'probs')):
-                makedirs(join(test_path, self.ck_name, 'probs'))
-            if not exists(join(test_path, self.ck_name, 'potentials')):
-                makedirs(join(test_path, self.ck_name, 'potentials'))
+            if not exists(test_path):
+                makedirs(test_path)
+            if not exists(join(test_path, 'predictions')):
+                makedirs(join(test_path, 'predictions'))
+            if not exists(join(test_path, 'probs')):
+                makedirs(join(test_path, 'probs'))
+            if not exists(join(test_path, 'potentials')):
+                makedirs(join(test_path, 'potentials'))
         else:
             test_path = None
 
@@ -276,9 +276,9 @@ class ModelTester:
 
                         # Reproject probs on the evaluations points
                         probs = self.test_probs[i][test_loader.dataset.test_proj[i], :]
-                        print('probs: ', probs.shape)
                         proj_probs += [probs]
 
+                        # Get pseudo labels
                         fn = file_path.split('/')[-1].split('.txt')[0]
                         unlabel_pts = self.test_probs[i][:, 0] == 0
                         all_pseduo_probs[fn] = self.test_probs[i]
@@ -286,8 +286,9 @@ class ModelTester:
                         pseudo_lbs[unlabel_pts] = 0
                         all_pseudo_lbs[fn] = pseudo_lbs
 
-                    pl_path = join(test_path, self.ck_name + '_' + 'pseudo.pickle')
-                    prob_path = join(test_path, self.ck_name + '_' + 'probs.pickle')
+                    # Save pseudo labels
+                    pl_path = join(test_path, '_pseudo.pickle')
+                    prob_path = join(test_path, '_probs.pickle')
                     with open(pl_path, 'wb') as fff:
                         pickle.dump(all_pseudo_lbs, fff)
                     with open(prob_path, 'wb') as fff:
@@ -320,18 +321,12 @@ class ModelTester:
 
                         # Regroup confusions
                         C = np.sum(np.stack(Confs), axis=0)
-                        # c_path1 = join(test_path, self.ck_name, 'predictions/confusion_o.txt')        # delete this? -jer
-                        # np.savetxt(c_path1, C, delimiter=' ', fmt='%i')
 
                         # Remove ignored labels from confusions
                         for l_ind, label_value in reversed(list(enumerate(test_loader.dataset.label_values))):
                             if label_value in test_loader.dataset.ignored_labels:
                                 C = np.delete(C, l_ind, axis=0)
                                 C = np.delete(C, l_ind, axis=1)
-
-                        # Save confusion       # delete this?  -jer
-                        # c_path = join(test_path, self.ck_name, 'predictions/confusion.txt')
-                        # np.savetxt(c_path, C, delimiter=' ', fmt='%i')
 
                         IoUs = IoU_from_confusions(C)
                         mIoU = np.mean(IoUs)
@@ -360,11 +355,11 @@ class ModelTester:
 
                         # Save plys
                         cloud_name = file_path.split('/')[-1]
-                        test_name = join(test_path, self.ck_name, 'predictions', cloud_name)
+                        test_name = join(test_path, 'predictions', cloud_name)
                         write_ply(test_name,
                                   [points, preds, targets, error_map],
                                   ['x', 'y', 'z', 'preds', 'targets', 'error'])
-                        test_name2 = join(test_path, self.ck_name, 'probs', cloud_name)
+                        test_name2 = join(test_path, 'probs', cloud_name)
                         prob_names = ['_'.join(test_loader.dataset.label_to_names[label].split())
                                       for label in test_loader.dataset.label_values]
                         write_ply(test_name2,
@@ -373,7 +368,7 @@ class ModelTester:
 
                         # Save potentials
                         pot_points = np.array(test_loader.dataset.pot_trees[i].data, copy=False)
-                        pot_name = join(test_path, self.ck_name, 'potentials', cloud_name)
+                        pot_name = join(test_path, 'potentials', cloud_name)
                         pots = test_loader.dataset.potentials[i].numpy().astype(np.float32)
                         write_ply(pot_name,
                                   [pot_points.astype(np.float32), pots],

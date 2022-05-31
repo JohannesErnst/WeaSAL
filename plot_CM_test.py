@@ -33,7 +33,7 @@ out_folder = "/".join(splitString[:-1])
 
 if dataset == 'Vaihingen3D':
     name = "Vaihingen3D_Test"
-    filename = "/home/valentin/WeaSAL/data/Vaihingen3D/Vaihingen3D_EVAL_WITH_REF.ply"
+    filename = "/home/valentin/WeaSAL/data/Vaihingen3D/Vaihingen3D_Testing.ply"
     # filename = "/home/valentin/WeaSAL/data/Vaihingen3D/Vaihingen3D_Traininig_val.ply"
     classes = {0: 'Powerline',
                1: 'LowVegetation',

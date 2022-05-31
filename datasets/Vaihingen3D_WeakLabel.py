@@ -109,10 +109,10 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 
         # Define datasets and splits
         # self.cloud_names = ['Vaihingen3D_Traininig_train', 'Vaihingen3D_Traininig_val', 'Vaihingen3D_EVAL_WITH_REF']
-        self.cloud_names = ['Vaihingen3D_Traininig_train', 'Vaihingen3D_Traininig_val']
-        # self.cloud_names = ['Vaihingen3D_Traininig_val', 'Vaihingen3D_Traininig_val']
-        # self.all_splits = [0, 1, 2]
-        self.all_splits = [0, 1]        # jer
+        self.cloud_names = ['Vaihingen3D_Training', 'Vaihingen3D_Training', 'Vaihingen3D_Testing']
+        #self.cloud_names = ['Vaihingen3D_Traininig_train', 'Vaihingen3D_Traininig_val']
+        self.all_splits = [0, 1, 2]
+        # self.all_splits = [0, 1]
         self.validation_split = 1
         self.test_split = 2
 
@@ -186,26 +186,27 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         self.batch_limit = torch.tensor([1], dtype=torch.float32)
         self.batch_limit.share_memory_()
 
-        # Define anchors (i.e. subregions of point cloud)
-        self.anchors = [] 
-        self.anchor_dicts = []
-        self.anchor_trees = [] 
-        self.anchor_lbs = [] 
-        for i, tree in enumerate(self.input_trees):
-            points = np.array(tree.data)
-            anchor = get_anchors(
-                points, config.sub_radius, xyz_offset=config.xyz_offset, method=config.anchor_method)
-            anchor, anchor_tree, anchors_dict, achor_lb = anchors_with_points(
-                tree, anchor, self.input_labels[i], config.sub_radius, config.num_classes)
+        # Define anchors (i.e. subregions of point cloud) for training/validation
+        if self.set == 'training' or self.set == 'validation':
+            self.anchors = [] 
+            self.anchor_dicts = []
+            self.anchor_trees = [] 
+            self.anchor_lbs = [] 
+            for i, tree in enumerate(self.input_trees):
+                points = np.array(tree.data)
+                anchor = get_anchors(
+                    points, config.sub_radius, xyz_offset=config.xyz_offset, method=config.anchor_method)
+                anchor, anchor_tree, anchors_dict, achor_lb = anchors_with_points(
+                    tree, anchor, self.input_labels[i], config.sub_radius, config.num_classes)
 
-            # Update subregion information according to overlaps
-            anchor, anchor_tree, anchors_dict, achor_lb = update_anchors(
-                tree, anchor, anchor_tree, anchors_dict, achor_lb, config.sub_radius)
+                # Update subregion information according to overlaps
+                anchor, anchor_tree, anchors_dict, achor_lb = update_anchors(
+                    tree, anchor, anchor_tree, anchors_dict, achor_lb, config.sub_radius)
 
-            self.anchors += [anchor]
-            self.anchor_dicts += [anchors_dict]
-            self.anchor_trees += [anchor_tree]
-            self.anchor_lbs += [achor_lb]
+                self.anchors += [anchor]
+                self.anchor_dicts += [anchors_dict]
+                self.anchor_trees += [anchor_tree]
+                self.anchor_lbs += [achor_lb]
 
         # Initialize potentials
         if use_potentials:
@@ -230,7 +231,6 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             self.worker_waiting.share_memory_()
             self.epoch_inds = None
             self.epoch_i = 0
-
         else:
             raise NotImplementedError('Only potential selection is supported')
 
@@ -361,30 +361,33 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             input_inds = self.input_trees[cloud_ind].query_radius(center_point,
                                                                   r=self.config.in_radius)[0]
 
-            # Get anchor (i.e. subregion) index
-            pot_anchor_tree = self.anchor_trees[cloud_ind]
-            pot_anchor_dict = self.anchor_dicts[cloud_ind]
-            pot_anchor_lb = self.anchor_lbs[cloud_ind]
+            # Handle anchors for training/validation
+            if self.set == 'training' or self.set == 'validation':
 
-            # Search neighbouring anchors (i.e. anchors in input region)
-            pot_anchor_inds, dists = pot_anchor_tree.query_radius(center_point,
-                                                    r=self.config.in_radius-self.config.sub_radius-0.01,
-                                                    return_distance=True)
+                # Get anchor (i.e. subregion) index
+                pot_anchor_tree = self.anchor_trees[cloud_ind]
+                pot_anchor_dict = self.anchor_dicts[cloud_ind]
+                pot_anchor_lb = self.anchor_lbs[cloud_ind]
 
-            t += [time.time()]
+                # Search neighbouring anchors (i.e. anchors in input region)
+                pot_anchor_inds, dists = pot_anchor_tree.query_radius(center_point,
+                                                        r=self.config.in_radius-self.config.sub_radius-0.01,
+                                                        return_distance=True)
 
-            # Map the ids in the original point clouds to the points in the selected subregion
-            region_idx = []
-            region_lb = []
-            for aa in range(pot_anchor_inds[0].shape[0]):   # for all neighbouring anchors
-                pot_ans_idx = pot_anchor_inds[0][aa]        # get anchor id
-                idx_r = pot_anchor_dict[pot_ans_idx][0][0]  # get corresponding points id
-                y = idx_r[np.in1d(idx_r,input_inds)]        # filter out points that are in subregion but not input region
-                ii_sorted = np.argsort(input_inds)          # sorted input indices
-                ypos = np.searchsorted(input_inds[ii_sorted], y)
-                idx = ii_sorted[ypos]                       # indices of subregion points in original point cloud
-                region_idx.append(idx)
-                region_lb.append(pot_anchor_lb[pot_ans_idx])
+                t += [time.time()]
+
+                # Map the ids in the original point clouds to the points in the selected subregion
+                region_idx = []
+                region_lb = []
+                for aa in range(pot_anchor_inds[0].shape[0]):   # for all neighbouring anchors
+                    pot_ans_idx = pot_anchor_inds[0][aa]        # get anchor id
+                    idx_r = pot_anchor_dict[pot_ans_idx][0][0]  # get corresponding points id
+                    y = idx_r[np.in1d(idx_r,input_inds)]        # filter out points that are in subregion but not input region
+                    ii_sorted = np.argsort(input_inds)          # sorted input indices
+                    ypos = np.searchsorted(input_inds[ii_sorted], y)
+                    idx = ii_sorted[ypos]                       # indices of subregion points in original point cloud
+                    region_idx.append(idx)
+                    region_lb.append(pot_anchor_lb[pot_ans_idx])
 
             t += [time.time()]
 
@@ -438,18 +441,22 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             ci_list += [cloud_ind]
             s_list += [scale]
             R_list += [R]
-            cl_list += [cloud_labels]
-            cla_list += [cloud_labels_all]            
-            region_list += [region_idx]
-            region_lb_list += [region_lb]
             cen_list += [center_point]
+            if self.set == 'training' or self.set == 'validation':
+                cl_list += [cloud_labels]
+                cla_list += [cloud_labels_all]            
+                region_list += [region_idx]
+                region_lb_list += [region_lb]
 
-            # Update batch size
-            batch_n += 1
-
-            # In case batch is full, stop
-            if batch_n > 1:
-                break
+            # Update batch size and stop when batch is full
+            if self.set == 'training' or self.set == 'validation':
+                batch_n += 1
+                if batch_n > 1:
+                    break
+            else:
+                batch_n += n
+                if batch_n > int(self.batch_limit):
+                    break
 
         ###################
         # Concatenate batch
@@ -460,13 +467,14 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         labels = np.concatenate(l_list, axis=0)
         point_inds = np.array(i_list, dtype=np.int32)
         cloud_inds = np.array(ci_list, dtype=np.int32)
-        cloud_lb = np.concatenate(cl_list, axis=0).astype('float32')
-        cloud_all_lb = np.concatenate(cla_list, axis=0).astype('float32')
         input_inds = np.concatenate(pi_list, axis=0)
         stack_lengths = np.array([pp.shape[0] for pp in p_list], dtype=np.int32)
         scales = np.array(s_list, dtype=np.float32)
         rots = np.stack(R_list, axis=0)
         cen_pts = np.concatenate(cen_list, axis=0).astype('float32')
+        if self.set == 'training' or self.set == 'validation':
+            cloud_lb = np.concatenate(cl_list, axis=0).astype('float32')
+            cloud_all_lb = np.concatenate(cla_list, axis=0).astype('float32')
 
         # Input features (4 means [ones  intensity absoluteHeight reducedHeight])
         stacked_features = np.ones_like(stacked_points[:, :1], dtype=np.float32)
@@ -497,8 +505,11 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         t += [time.time()]
 
         # Add scale and rotation for testing
-        input_list += [scales, rots, cloud_inds, point_inds, input_inds,
-                       cloud_lb, cloud_all_lb, region_list, region_lb_list, cen_pts]
+        if self.set == 'training' or self.set == 'validation':
+            input_list += [scales, rots, cloud_inds, point_inds, input_inds,
+                           cloud_lb, cloud_all_lb, region_list, region_lb_list, cen_pts]
+        else:
+            input_list += [scales, rots, cloud_inds, point_inds, input_inds, cen_pts]
 
         if debug_workers:
             message = ''
@@ -1284,13 +1295,15 @@ class Vaihingen3DWLCustomBatch:
     def __init__(self, input_list):
 
         # Get rid of batch dimension and check dimension
+        # Debug this error where set is not available here -jer
         input_list = input_list[0]
-        if not (len(input_list) - 12) % 5 == 0:
-            raise ValueError('Input list is incomplete for weak label training')
+        if len(input_list) == 27:
+            L = (len(input_list) - 12) // 5     # number of layers for training/validation
+        elif len(input_list) == 23:
+            L = (len(input_list) - 8) // 5      # number of layers for testing
+        else:
+            raise ValueError('Input list is incomplete for weak label classification')
             
-        # Number of layers
-        L = (len(input_list) - 12) // 5
-
         # Extract input tensors from the list of numpy array
         ind = 0
         self.points = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
@@ -1317,14 +1330,15 @@ class Vaihingen3DWLCustomBatch:
         ind += 1
         self.input_inds = torch.from_numpy(input_list[ind])
         ind += 1
-        self.cl_lb = torch.from_numpy(input_list[ind])
-        ind += 1
-        self.cl_all_lb = torch.from_numpy(input_list[ind])            
-        ind += 1
-        self.region = input_list[ind]
-        ind += 1
-        self.region_lb = input_list[ind]  
-        ind += 1
+        if len(input_list) == 27:
+            self.cl_lb = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.cl_all_lb = torch.from_numpy(input_list[ind])            
+            ind += 1
+            self.region = input_list[ind]
+            ind += 1
+            self.region_lb = input_list[ind]  
+            ind += 1
         self.center_pts = torch.from_numpy(input_list[ind])
 
         return
@@ -1346,8 +1360,10 @@ class Vaihingen3DWLCustomBatch:
         self.cloud_inds = self.cloud_inds.pin_memory()
         self.center_inds = self.center_inds.pin_memory()
         self.input_inds = self.input_inds.pin_memory()
-        self.cl_lb = self.cl_lb.pin_memory()
-        self.cl_all_lb =self.cl_lb.pin_memory()
+        if hasattr(self, 'cl_lb'):
+            self.cl_lb = self.cl_lb.pin_memory()
+        if hasattr(self, 'cl_all_lb'):
+            self.cl_all_lb = self.cl_all_lb.pin_memory()
         if hasattr(self, 'center_pts'):    
             self.center_pts = self.center_pts.pin_memory()
         
@@ -1367,8 +1383,10 @@ class Vaihingen3DWLCustomBatch:
         self.cloud_inds = self.cloud_inds.to(device)
         self.center_inds = self.center_inds.to(device)
         self.input_inds = self.input_inds.to(device)
-        self.cl_lb = self.cl_lb.to(device)
-        self.cl_all_lb =self.cl_lb.to(device)
+        if hasattr(self, 'cl_lb'):
+            self.cl_lb = self.cl_lb.to(device)
+        if hasattr(self, 'cl_all_lb'):
+            self.cl_all_lb = self.cl_all_lb.to(device)
         if hasattr(self, 'center_pts'):
             self.center_pts = self.center_pts.to(device)
         

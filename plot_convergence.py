@@ -36,7 +36,7 @@ from utils.metrics import IoU_from_confusions, smooth_metrics, fast_confusion
 from utils.ply import read_ply
 
 # Datasets
-from datasets.Vaihingen3D import Vaihingen3DDataset
+from datasets.Vaihingen3D_WeakLabel import Vaihingen3DWLDataset
 
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -734,8 +734,8 @@ def experiment_name_1():
     """
 
     # Using the dates of the logs, you can easily gather consecutive ones. All logs should be of the same dataset.
-    start = 'Log_2022-05-05_12-02-36'
-    end = 'Log_2022-05-05_15-02-36'
+    start = 'Log_2022-05-30_14-32-37'
+    end = 'Log_2022-05-30_14-32-37'
 
     # Name of the result path
     res_path = 'results'
@@ -744,7 +744,7 @@ def experiment_name_1():
     logs = np.sort([join(res_path, l) for l in listdir_str(res_path) if start <= l <= end])
 
     # Give names to the logs (for plot legends)
-    logs_names = ['V3D all classes',
+    logs_names = ['V3D weak label',
                   '']
 
     # safe check log names
@@ -832,7 +832,7 @@ if __name__ == '__main__':
         compare_convergences_classif(logs, logs_names)
     elif config.dataset_task == 'cloud_segmentation':
         if config.dataset.startswith('Vaihingen3D'):
-            dataset = Vaihingen3DDataset(config, load_data=False)
+            dataset = Vaihingen3DWLDataset(config, load_data=False)
             compare_convergences_segment(dataset, logs, logs_names) 
         # elif config.dataset.startswith('DALES'):
         #     dataset = DALESDataset(config, load_data=False)

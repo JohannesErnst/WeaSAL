@@ -7,7 +7,7 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Callable script to test networks on variable datasets
+#      Callable script to test weak region-label classification networks on variable datasets
 #      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
@@ -20,7 +20,7 @@
 #       \**********************************/
 #
 
-# rename this file when it can be used for all datasets with weak labels and change description above -jer
+# Rename this script at some point if it can also be used for testing on pseudo labels -jer
 
 # Common libs
 import signal
@@ -30,7 +30,7 @@ import sys
 import torch
 
 # Dataset
-from datasets.Vaihingen3D_WeakLabel import *        # this needs to change probably -jer
+from datasets.Vaihingen3D_WeakLabel import *
 from torch.utils.data import DataLoader
 
 from utils.config import Config
@@ -94,13 +94,13 @@ if __name__ == '__main__':
     #       > 'last_XXX': Automatically retrieve the last trained model on dataset XXX
     #       > '(old_)results/Log_YYYY-MM-DD_HH-MM-SS': Directly provide the path of a trained model
 
-    chosen_log = 'results/'
+    chosen_log = 'results/Log_2022-05-30_14-32-37'
 
     # Choose the index of the checkpoint to load OR None if you want to load the current checkpoint
     chkp_idx = -1
 
     # Choose to test on validation or test split
-    on_val = True
+    on_val = False
 
     # Deal with 'last_XXXXXX' choices
     chosen_log = model_choice(chosen_log)
@@ -190,7 +190,7 @@ if __name__ == '__main__':
 
     # Define network model
     t1 = time.time()
-    config.model_name = 'KPFCNN_mprm_ele'
+    config.model_name = 'KPFCNN_mprm'
     if config.model_name == 'KPFCNN_mprm':
         net = KPFCNN_mprm(config, test_dataset.label_values, test_dataset.ignored_labels)
     elif config.model_name == 'KPFCNN_mprm_ele':
@@ -205,8 +205,8 @@ if __name__ == '__main__':
     print('\nStart test')
     print('**********\n')
 
-    # Training
+    # Testing
     if config.dataset_task == 'cloud_segmentation':
-        tester.cloud_segmentation_test(net, test_loader, config, num_votes=0)
+        tester.cloud_segmentation_test(net, test_loader, config, num_votes=10)
     else:
         raise ValueError('Unsupported dataset_task for testing: ' + config.dataset_task)
