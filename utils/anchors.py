@@ -157,6 +157,6 @@ def update_anchors(input_tree, clean_anchors, anchor_tree, anchors_dict, anchor_
                 clean_anchors = np.vstack((clean_anchors, np.expand_dims(new_anchor, axis=0)))
                 cc = cc+1
                 
-    print('Anchors considering overlaps: {:.0f}\n'.format(cc))      # maybe remove this at some point -jer
+    print('Anchors considering overlaps: {:.0f}\n'.format(cc))
     anchor_tree = KDTree(clean_anchors, leaf_size=10)
     return clean_anchors, anchor_tree, anchors_dict, anchor_lbs

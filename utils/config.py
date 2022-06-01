@@ -267,10 +267,10 @@ class Config:
                 elif line_info[0] == 'dropout':
                     setattr(self, line_info[0], line_info[2]) 
                 
-                elif line_info[0] == 'model_name':              # do i need this? -jer
+                elif line_info[0] == 'model_name':
                     setattr(self, line_info[0], line_info[2])
 
-                elif line_info[0] == 'loss_type':               # do i need this? -jer
+                elif line_info[0] == 'loss_type':
                     setattr(self, line_info[0], line_info[2])
 
                 elif hasattr(self, line_info[0]):
@@ -403,10 +403,6 @@ class Config:
                 for a in self.xyz_offset:
                     text_file.write(' {:.6f}'.format(a))
             text_file.write('\n')
-            # if hasattr(self, 'previous_training_path'):             # delete this? -jer
-            #     text_file.write('previous_training_path = {:s}\n'.format(self.previous_training_path))
-            # if hasattr(self, 'chkp_idx'):                           # delete this? -jer
-            #     text_file.write('chkp_idx = {:.6f}\n'.format(self.chkp_idx))
             if hasattr(self, 'model_name'):                         
                 text_file.write('model_name = {:s}\n'.format(self.model_name))
             if hasattr(self, 'loss_type'):                          # check the following hasattr whether to delete -jer
@@ -414,27 +410,13 @@ class Config:
             if hasattr(self, 'contrast_start'):
                 text_file.write('contrast_start = {:.6f}\n'.format(self.contrast_start))      
             if hasattr(self, 'contrast_thd'):
-                text_file.write('contrast_thd = {:.6f}\n'.format(self.contrast_thd))                   
-            if hasattr(self, 'heads'):
-                text_file.write('heads = {:s}\n'.format(self.heads))              
+                text_file.write('contrast_thd = {:.6f}\n'.format(self.contrast_thd))       
             if hasattr(self, 'anchor_method'):
-                text_file.write('anchor_method = {:s}\n'.format(self.anchor_method))                   
-            if hasattr(self, 'grad_method'):
-                text_file.write('grad_method = {:s}\n'.format(self.grad_method))                    
-            # if hasattr(self, 'optopt'):           # delet eventually -jer
-            #     text_file.write('optopt = {:s}\n'.format(self.optopt))                    
-            if hasattr(self, 'ck'):
-                text_file.write('ck = {:s}\n'.format(self.ck))     
+                text_file.write('anchor_method = {:s}\n'.format(self.anchor_method))                                                  
             if hasattr(self, 'model_n'):
-                text_file.write('model_n = {:s}\n'.format(self.model_n))       
-            if hasattr(self, 'cl_w'):
-                text_file.write('cl_w = {:.6f}\n'.format(self.cl_w))     
-            if hasattr(self, 'slc_con'):
-                text_file.write('slc_con = {:.3f}\n'.format(self.slc_con))  
-            if hasattr(self, 'use_pretrained'):                 # pretty sure to delete this -jer
-                text_file.write('use_pretrained = {:.3f}\n'.format(self.use_pretrained))     
-            if hasattr(self, 'pretxt'):                         # pretty sure to delete this -jer
-                text_file.write('pretxt = {:s}\n'.format(self.pretxt))    
+                text_file.write('model_n = {:s}\n'.format(self.model_n))        
+            # if hasattr(self, 'slc_con'):
+            #     text_file.write('slc_con = {:.3f}\n'.format(self.slc_con))  
             if hasattr(self, 'dropout'):
                 text_file.write('dropout = {:.3f}\n'.format(self.dropout))
 

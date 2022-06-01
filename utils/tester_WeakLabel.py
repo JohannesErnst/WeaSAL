@@ -66,9 +66,6 @@ class ModelTester:
             self.device = torch.device("cpu")
         net.to(self.device)
 
-        # What exactly does this do and is it necessary? also all other occurances of ck_name? -jer
-        # self.ck_name = chkp_path.split('/')[-1].split('.tar')[0]
-
         ##########################
         # Load previous checkpoint
         ##########################

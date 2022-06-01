@@ -565,18 +565,18 @@ class SimpleBlock(nn.Module):
         return self.leaky_relu(self.batch_norm(x))
 
 
-class SimpleBlock1(nn.Module):      # Do we realloy need both simpleBlocks? They only differ marginaly -jer
+class SimpleBlock2(nn.Module):
 
     def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, config):
         """
         Initialize a simple convolution block with its ReLU and BatchNorm.
-        Uses (out_dim) instead of (out_dim // 2)
+        Uses (out_dim) instead of (out_dim // 2) which means double output dimension.
         :param in_dim: dimension input features
         :param out_dim: dimension output features
         :param radius: current radius of convolution
         :param config: parameters
         """
-        super(SimpleBlock1, self).__init__()
+        super(SimpleBlock2, self).__init__()
 
         # get KP_extent from current radius
         current_extent = radius * config.KP_extent / config.conv_radius
@@ -776,13 +776,13 @@ class spatial_att(nn.Module):
         self.out_dim = out_dim
         
         # Combining blocks
-        self.simple1 = SimpleBlock1(block_name, in_dim, out_dim, radius, layer_ind, config)
+        self.simple1 = SimpleBlock2(block_name, in_dim, out_dim, radius, layer_ind, config)
         self.unary1 = UnaryBlock(out_dim, out_dim // 8, self.use_bn, self.bn_momentum)
         self.unary2 = UnaryBlock(out_dim, out_dim // 8, self.use_bn, self.bn_momentum)
         self.unary3 = UnaryBlock(out_dim, out_dim, self.use_bn, self.bn_momentum)
         self.gamma = Parameter(torch.zeros(1))
         self.softmax = nn.Softmax(dim=-1)
-        self.simple2 = SimpleBlock1(block_name, in_dim, out_dim, radius, layer_ind, config)
+        self.simple2 = SimpleBlock2(block_name, in_dim, out_dim, radius, layer_ind, config)
 
         return
 
@@ -822,7 +822,7 @@ class spatial_att(nn.Module):
         return merged, xn
 
 
-class channel_att_new2(nn.Module):      # rename this once you know where it is referenced -jer
+class channel_att(nn.Module):
 
     def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, config):
         """
@@ -832,7 +832,7 @@ class channel_att_new2(nn.Module):      # rename this once you know where it is 
         :param radius: current radius of convolution
         :param config: parameters
         """
-        super(channel_att_new2, self).__init__()
+        super(channel_att, self).__init__()
 
         self.bn_momentum = config.batch_norm_momentum
         self.use_bn = config.use_batch_norm
@@ -842,12 +842,12 @@ class channel_att_new2(nn.Module):      # rename this once you know where it is 
         self.out_dim = out_dim
         
         # Combining blocks
-        self.simple1 = SimpleBlock1(block_name, in_dim, out_dim // 8, radius, layer_ind, config)
+        self.simple1 = SimpleBlock2(block_name, in_dim, out_dim // 8, radius, layer_ind, config)
         self.unary1 = UnaryBlock(out_dim // 8, out_dim // 8, self.use_bn, self.bn_momentum)
         self.unary2 = UnaryBlock(out_dim // 8, out_dim // 8, self.use_bn, self.bn_momentum)
         self.gamma = Parameter(torch.zeros(1))
         self.softmax = nn.Softmax(dim=-1)
-        self.simple2 = SimpleBlock1(block_name, out_dim // 8, out_dim, radius, layer_ind, config)
+        self.simple2 = SimpleBlock2(block_name, out_dim // 8, out_dim, radius, layer_ind, config)
 
         return
 
@@ -883,11 +883,11 @@ class channel_att_new2(nn.Module):      # rename this once you know where it is 
         return merged
 
 
-class dual_att(nn.Module):          # Is this the point-wise attention module? Pretty sure it is, compare with KPFCNN_mprm forward pass but don't rename -jer
+class dual_att(nn.Module):
 
     def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, config):
         """
-        Initialize a dual attention module.
+        Initialize a dual attention module (point-wise attention module in paper).
         :param in_dim: dimension input features
         :param out_dim: dimension output features
         :param radius: current radius of convolution
@@ -905,8 +905,8 @@ class dual_att(nn.Module):          # Is this the point-wise attention module? P
         # Combining blocks
         fdim = config.num_classes
         self.sa_f = spatial_att(block_name, in_dim, out_dim, radius, layer_ind, config)
-        self.ca_f = channel_att_new2(block_name, in_dim, out_dim, radius, layer_ind, config)
-        self.simple1 = SimpleBlock1(block_name, in_dim+out_dim, out_dim, radius, layer_ind, config)
+        self.ca_f = channel_att(block_name, in_dim, out_dim, radius, layer_ind, config)
+        self.simple1 = SimpleBlock2(block_name, in_dim+out_dim, out_dim, radius, layer_ind, config)
         self.sa_unary = UnaryBlock(out_dim, fdim, self.use_bn, self.bn_momentum)
         self.ca_unary = UnaryBlock(out_dim, fdim, self.use_bn, self.bn_momentum)
         self.no_unary = UnaryBlock(in_dim, fdim, self.use_bn, self.bn_momentum)
@@ -983,7 +983,7 @@ class ele_att(nn.Module):
         self.unary2 = UnaryBlock(in_dim, out_dim, self.use_bn, self.bn_momentum)
         self.gamma = Parameter(torch.zeros(1))
         self.softmax = nn.Softmax(dim=-1)
-        self.simple2 = SimpleBlock1(block_name, out_dim, out_dim, radius, layer_ind, config)
+        self.simple2 = SimpleBlock2(block_name, out_dim, out_dim, radius, layer_ind, config)
         return
 
     def forward(self, features, h, batch):
