@@ -107,7 +107,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         else:
             ply_path = join(self.path, self.train_path)
 
-        # Define datasets and splits
+        # Define datasets and splits # clean this in the end -jer
         # self.cloud_names = ['Vaihingen3D_Traininig_train', 'Vaihingen3D_Traininig_val', 'Vaihingen3D_EVAL_WITH_REF']
         self.cloud_names = ['Vaihingen3D_Training', 'Vaihingen3D_Training', 'Vaihingen3D_Testing']
         #self.cloud_names = ['Vaihingen3D_Traininig_train', 'Vaihingen3D_Traininig_val']
@@ -186,8 +186,8 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         self.batch_limit = torch.tensor([1], dtype=torch.float32)
         self.batch_limit.share_memory_()
 
-        # Define anchors (i.e. subregions of point cloud) for training/validation
-        if self.set == 'training' or self.set == 'validation':
+        # Define anchors (i.e. subregions of point cloud) for training
+        if self.set == 'training':
             self.anchors = [] 
             self.anchor_dicts = []
             self.anchor_trees = [] 
@@ -361,8 +361,8 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             input_inds = self.input_trees[cloud_ind].query_radius(center_point,
                                                                   r=self.config.in_radius)[0]
 
-            # Handle anchors for training/validation
-            if self.set == 'training' or self.set == 'validation':
+            # Handle anchors for training
+            if self.set == 'training':
 
                 # Get anchor (i.e. subregion) index
                 pot_anchor_tree = self.anchor_trees[cloud_ind]
@@ -442,14 +442,14 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             s_list += [scale]
             R_list += [R]
             cen_list += [center_point]
-            if self.set == 'training' or self.set == 'validation':
+            if self.set == 'training':
                 cl_list += [cloud_labels]
                 cla_list += [cloud_labels_all]            
                 region_list += [region_idx]
                 region_lb_list += [region_lb]
 
             # Update batch size and stop when batch is full
-            if self.set == 'training' or self.set == 'validation':
+            if self.set == 'training':
                 batch_n += 1
                 if batch_n > 1:
                     break
@@ -472,7 +472,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         scales = np.array(s_list, dtype=np.float32)
         rots = np.stack(R_list, axis=0)
         cen_pts = np.concatenate(cen_list, axis=0).astype('float32')
-        if self.set == 'training' or self.set == 'validation':
+        if self.set == 'training':
             cloud_lb = np.concatenate(cl_list, axis=0).astype('float32')
             cloud_all_lb = np.concatenate(cla_list, axis=0).astype('float32')
 
@@ -504,8 +504,8 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 
         t += [time.time()]
 
-        # Add scale and rotation for testing
-        if self.set == 'training' or self.set == 'validation':
+        # Add scale, rotation and labels to input list
+        if self.set == 'training':
             input_list += [scales, rots, cloud_inds, point_inds, input_inds,
                            cloud_lb, cloud_all_lb, region_list, region_lb_list, cen_pts]
         else:
@@ -1297,9 +1297,9 @@ class Vaihingen3DWLCustomBatch:
         # Get rid of batch dimension and check dimension
         input_list = input_list[0]
         if len(input_list) == 27:
-            L = (len(input_list) - 12) // 5     # number of layers for training/validation
+            L = (len(input_list) - 12) // 5     # number of layers for training
         elif len(input_list) == 23:
-            L = (len(input_list) - 8) // 5      # number of layers for testing
+            L = (len(input_list) - 8) // 5      # number of layers for testing/validation
         else:
             raise ValueError('Input list is incomplete for weak label classification')
             
