@@ -7,14 +7,13 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Class handling the training of any model
+#      Class handling the training with weak region-labels (classification network)
+#      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #      Hugues THOMAS - 11/06/2018
 #
-
-
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #           Imports and global variables
@@ -35,6 +34,9 @@ import sys
 
 # PLY reader
 from utils.ply import read_ply, write_ply
+
+# Confusion matrix function
+import utils.conf_matrix as conf_matrix
 
 # Metrics
 from utils.metrics import IoU_from_confusions, fast_confusion
@@ -78,6 +80,7 @@ class ModelTrainer:
         deform_params = [v for k, v in net.named_parameters() if 'offset' in k]
         other_params = [v for k, v in net.named_parameters() if 'offset' not in k]
         deform_lr = config.learning_rate * config.deform_lr_factor
+        # here, Lin et al implemented adam algorithm as an optimizer but I think this is not needed (If confused just delete this comment) -jer
         self.optimizer = torch.optim.SGD([{'params': other_params},
                                           {'params': deform_params, 'lr': deform_lr}],
                                          lr=config.learning_rate,
@@ -185,9 +188,14 @@ class ModelTrainer:
                 self.optimizer.zero_grad()
 
                 # Forward pass
-                outputs = net(batch, config)
-                loss = net.loss(outputs, batch.labels)
-                acc = net.accuracy(outputs, batch.labels)
+                self.logits, self.class_logits, self.cam = net(batch, config)
+
+                # Classification loss and accuracy
+                if config.loss_type == 'region_mprm_loss':
+                    loss = net.region_mprm_loss(self.cam, batch.region, batch.region_lb, batch.lengths[0])
+                else:
+                    loss = net.class_logits_loss(self.class_logits, batch.cl_lb)
+                acc = net.accuracy_logits(self.logits, batch.labels)
 
                 t += [time.time()]
 
@@ -195,11 +203,10 @@ class ModelTrainer:
                 loss.backward()
 
                 if config.grad_clip_norm > 0:
-                    #torch.nn.utils.clip_grad_norm_(net.parameters(), config.grad_clip_norm)
-                    torch.nn.utils.clip_grad_value_(net.parameters(), config.grad_clip_norm)
+                    torch.nn.utils.clip_grad_norm_(net.parameters(), config.grad_clip_norm)
+                    # torch.nn.utils.clip_grad_value_(net.parameters(), config.grad_clip_norm)
                 self.optimizer.step()
 
-                
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize(self.device)
 
@@ -228,7 +235,7 @@ class ModelTrainer:
                         message = '{:d} {:d} {:.3f} {:.3f} {:.3f} {:.3f}\n'
                         file.write(message.format(self.epoch,
                                                   self.step,
-                                                  net.output_loss,
+                                                  net.output_loss,          # this is net.item in Lin et al. change if raises error -jer
                                                   net.reg_loss,
                                                   acc,
                                                   t[-1] - t0))
@@ -282,136 +289,10 @@ class ModelTrainer:
 
     def validation(self, net, val_loader, config: Config):
 
-        if config.dataset_task == 'classification':
-            self.object_classification_validation(net, val_loader, config)
-        elif config.dataset_task == 'segmentation':
-            self.object_segmentation_validation(net, val_loader, config)
-        elif config.dataset_task == 'cloud_segmentation':
+        if config.dataset_task == 'cloud_segmentation':
             self.cloud_segmentation_validation(net, val_loader, config)
-        elif config.dataset_task == 'slam_segmentation':
-            self.slam_segmentation_validation(net, val_loader, config)
         else:
             raise ValueError('No validation method implemented for this network type')
-
-    def object_classification_validation(self, net, val_loader, config):
-        """
-        Perform a round of validation and show/save results
-        :param net: network object
-        :param val_loader: data loader for validation set
-        :param config: configuration object
-        """
-
-        ############
-        # Initialize
-        ############
-
-        # Choose validation smoothing parameter (0 for no smothing, 0.99 for big smoothing)
-        val_smooth = 0.95
-
-        # Number of classes predicted by the model
-        nc_model = config.num_classes
-        softmax = torch.nn.Softmax(1)
-
-        # Initialize global prediction over all models
-        if not hasattr(self, 'val_probs'):
-            self.val_probs = np.zeros((val_loader.dataset.num_models, nc_model))
-
-        #####################
-        # Network predictions
-        #####################
-
-        probs = []
-        targets = []
-        obj_inds = []
-
-        t = [time.time()]
-        last_display = time.time()
-        mean_dt = np.zeros(1)
-
-        # Start validation loop
-        for batch in val_loader:
-
-            # New time
-            t = t[-1:]
-            t += [time.time()]
-
-            if 'cuda' in self.device.type:
-                batch.to(self.device)
-
-            # Forward pass
-            outputs = net(batch, config)
-
-            # Get probs and labels
-            probs += [softmax(outputs).cpu().detach().numpy()]
-            targets += [batch.labels.cpu().numpy()]
-            obj_inds += [batch.model_inds.cpu().numpy()]
-            torch.cuda.synchronize(self.device)
-
-            # Average timing
-            t += [time.time()]
-            mean_dt = 0.95 * mean_dt + 0.05 * (np.array(t[1:]) - np.array(t[:-1]))
-
-            # Display
-            if (t[-1] - last_display) > 1.0:
-                last_display = t[-1]
-                message = 'Validation : {:.1f}% (timings : {:4.2f} {:4.2f})'
-                print(message.format(100 * len(obj_inds) / config.validation_size,
-                                     1000 * (mean_dt[0]),
-                                     1000 * (mean_dt[1])))
-
-        # Stack all validation predictions
-        probs = np.vstack(probs)
-        targets = np.hstack(targets)
-        obj_inds = np.hstack(obj_inds)
-
-        ###################
-        # Voting validation
-        ###################
-
-        self.val_probs[obj_inds] = val_smooth * self.val_probs[obj_inds] + (1-val_smooth) * probs
-
-        ############
-        # Confusions
-        ############
-
-        validation_labels = np.array(val_loader.dataset.label_values)
-
-        # Compute classification results
-        C1 = fast_confusion(targets,
-                            np.argmax(probs, axis=1),
-                            validation_labels)
-
-        # Compute votes confusion
-        C2 = fast_confusion(val_loader.dataset.input_labels,
-                            np.argmax(self.val_probs, axis=1),
-                            validation_labels)
-
-
-        # Saving (optionnal)
-        if config.saving:
-            print("Save confusions")
-            conf_list = [C1, C2]
-            file_list = ['val_confs.txt', 'vote_confs.txt']
-            for conf, conf_file in zip(conf_list, file_list):
-                test_file = join(config.saving_path, conf_file)
-                if exists(test_file):
-                    with open(test_file, "a") as text_file:
-                        for line in conf:
-                            for value in line:
-                                text_file.write('%d ' % value)
-                        text_file.write('\n')
-                else:
-                    with open(test_file, "w") as text_file:
-                        for line in conf:
-                            for value in line:
-                                text_file.write('%d ' % value)
-                        text_file.write('\n')
-
-        val_ACC = 100 * np.sum(np.diag(C1)) / (np.sum(C1) + 1e-6)
-        vote_ACC = 100 * np.sum(np.diag(C2)) / (np.sum(C2) + 1e-6)
-        print('Accuracies : val = {:.1f}% / vote = {:.1f}%'.format(val_ACC, vote_ACC))
-
-        return C1
 
     def cloud_segmentation_validation(self, net, val_loader, config, debug=False):
         """
@@ -478,10 +359,10 @@ class ModelTrainer:
                 batch.to(self.device)
 
             # Forward pass
-            outputs = net(batch, config)
+            self.logits, self.class_logits, self.cam = net(batch, config)
 
             # Get probs and labels
-            stacked_probs = softmax(outputs).cpu().detach().numpy()
+            stacked_probs = softmax(self.logits).cpu().detach().numpy()
             labels = batch.labels.cpu().numpy()
             lengths = batch.lengths[0].cpu().numpy()
             in_inds = batch.input_inds.cpu().numpy()
@@ -561,7 +442,7 @@ class ModelTrainer:
 
         t5 = time.time()
 
-        # Saving (optionnal)
+        # Saving (optional)
         if config.saving:
 
             # Name of saving file
@@ -602,12 +483,18 @@ class ModelTrainer:
         mIoU = 100 * np.mean(IoUs)
         print('{:s} mean IoU = {:.1f}%'.format(config.dataset, mIoU))
 
-        # Save predicted cloud occasionally
+        # Save confusions occasionally
         if config.saving and (self.epoch + 1) % config.checkpoint_gap == 0:
             val_path = join(config.saving_path, 'val_preds_{:d}'.format(self.epoch + 1))
             if not exists(val_path):
                 makedirs(val_path)
             files = val_loader.dataset.files
+            Confs = np.zeros((config.num_classes, config.num_classes), dtype=np.int32)
+            if config.dataset in ['rotterdam', 'Dales']:
+                # this needs to be changed since i don't use rotterdam. But do we even get here? -jer
+                exit("Stop here and look into code -jer")
+                Confs = np.zeros((config.num_classes+1, config.num_classes+1), dtype=np.int32)
+                
             for i, file_path in enumerate(files):
 
                 # Get points
@@ -627,15 +514,26 @@ class ModelTrainer:
                 # Reproject preds on the evaluations points
                 preds = (sub_preds[val_loader.dataset.test_proj[i]]).astype(np.int32)
 
-                # Path of saved validation file
-                cloud_name = file_path.split('/')[-1]
-                val_name = join(val_path, cloud_name)
-
-                # Save file
+                # Add up confusions
                 labels = val_loader.dataset.validation_labels[i].astype(np.int32)
-                write_ply(val_name,
-                          [points, preds, labels],
-                          ['x', 'y', 'z', 'preds', 'class'])
+                Confs += fast_confusion(labels, preds, val_loader.dataset.label_values).astype(np.int32)
+
+            # Save confusions
+            c_path = join(val_path, 'conf.txt')
+            np.savetxt(c_path, Confs, delimiter=' ', fmt='%i')
+            conf_matrix.plot(Confs, val_loader.dataset.label_to_names, val_path, 
+                             file_suffix=val_loader.dataset.cloud_names[0],
+                             abs_vals=False, F1=True, iou=True, show=False)
+
+            # Remove ignored labels from confusions
+            for l_ind, label_value in reversed(list(enumerate(val_loader.dataset.label_values))):
+                if label_value in val_loader.dataset.ignored_labels:
+                    Confs = np.delete(Confs, l_ind, axis=0)
+                    Confs = np.delete(Confs, l_ind, axis=1)
+
+            # Print IoUs            
+            IoUs = IoU_from_confusions(Confs)
+            print(IoUs)
 
         # Display timings
         t7 = time.time()
@@ -652,285 +550,3 @@ class ModelTrainer:
             print('\n************************\n')
 
         return
-
-    def slam_segmentation_validation(self, net, val_loader, config, debug=True):
-        """
-        Validation method for slam segmentation models
-        """
-
-        ############
-        # Initialize
-        ############
-
-        t0 = time.time()
-
-        # Do not validate if dataset has no validation cloud
-        if val_loader is None:
-            return
-
-        # Choose validation smoothing parameter (0 for no smothing, 0.99 for big smoothing)
-        val_smooth = 0.95
-        softmax = torch.nn.Softmax(1)
-
-        # Create folder for validation predictions
-        if not exists (join(config.saving_path, 'val_preds')):
-            makedirs(join(config.saving_path, 'val_preds'))
-
-        # initiate the dataset validation containers
-        val_loader.dataset.val_points = []
-        val_loader.dataset.val_labels = []
-
-        # Number of classes including ignored labels
-        nc_tot = val_loader.dataset.num_classes
-
-        #####################
-        # Network predictions
-        #####################
-
-        predictions = []
-        targets = []
-        inds = []
-        val_i = 0
-
-        t = [time.time()]
-        last_display = time.time()
-        mean_dt = np.zeros(1)
-
-
-        t1 = time.time()
-
-        # Start validation loop
-        for i, batch in enumerate(val_loader):
-
-            # New time
-            t = t[-1:]
-            t += [time.time()]
-
-            if 'cuda' in self.device.type:
-                batch.to(self.device)
-
-            # Forward pass
-            outputs = net(batch, config)
-
-            # Get probs and labels
-            stk_probs = softmax(outputs).cpu().detach().numpy()
-            lengths = batch.lengths[0].cpu().numpy()
-            f_inds = batch.frame_inds.cpu().numpy()
-            r_inds_list = batch.reproj_inds
-            r_mask_list = batch.reproj_masks
-            labels_list = batch.val_labels
-            torch.cuda.synchronize(self.device)
-
-            # Get predictions and labels per instance
-            # ***************************************
-
-            i0 = 0
-            for b_i, length in enumerate(lengths):
-
-                # Get prediction
-                probs = stk_probs[i0:i0 + length]
-                proj_inds = r_inds_list[b_i]
-                proj_mask = r_mask_list[b_i]
-                frame_labels = labels_list[b_i]
-                s_ind = f_inds[b_i, 0]
-                f_ind = f_inds[b_i, 1]
-
-                # Project predictions on the frame points
-                proj_probs = probs[proj_inds]
-
-                # Safe check if only one point:
-                if proj_probs.ndim < 2:
-                    proj_probs = np.expand_dims(proj_probs, 0)
-
-                # Insert false columns for ignored labels
-                for l_ind, label_value in enumerate(val_loader.dataset.label_values):
-                    if label_value in val_loader.dataset.ignored_labels:
-                        proj_probs = np.insert(proj_probs, l_ind, 0, axis=1)
-
-                # Predicted labels
-                preds = val_loader.dataset.label_values[np.argmax(proj_probs, axis=1)]
-
-                # Save predictions in a binary file
-                filename = '{:s}_{:07d}.npy'.format(val_loader.dataset.sequences[s_ind], f_ind)
-                filepath = join(config.saving_path, 'val_preds', filename)
-                if exists(filepath):
-                    frame_preds = np.load(filepath)
-                else:
-                    frame_preds = np.zeros(frame_labels.shape, dtype=np.uint8)
-                frame_preds[proj_mask] = preds.astype(np.uint8)
-                np.save(filepath, frame_preds)
-
-                # Save some of the frame pots
-                if f_ind % 20 == 0:
-                    seq_path = join(val_loader.dataset.path, 'sequences', val_loader.dataset.sequences[s_ind])
-                    velo_file = join(seq_path, 'velodyne', val_loader.dataset.frames[s_ind][f_ind] + '.bin')
-                    frame_points = np.fromfile(velo_file, dtype=np.float32)
-                    frame_points = frame_points.reshape((-1, 4))
-                    write_ply(filepath[:-4] + '_pots.ply',
-                              [frame_points[:, :3], frame_labels, frame_preds],
-                              ['x', 'y', 'z', 'gt', 'pre'])
-
-                # Update validation confusions
-                frame_C = fast_confusion(frame_labels,
-                                         frame_preds.astype(np.int32),
-                                         val_loader.dataset.label_values)
-                val_loader.dataset.val_confs[s_ind][f_ind, :, :] = frame_C
-
-                # Stack all prediction for this epoch
-                predictions += [preds]
-                targets += [frame_labels[proj_mask]]
-                inds += [f_inds[b_i, :]]
-                val_i += 1
-                i0 += length
-
-            # Average timing
-            t += [time.time()]
-            mean_dt = 0.95 * mean_dt + 0.05 * (np.array(t[1:]) - np.array(t[:-1]))
-
-            # Display
-            if (t[-1] - last_display) > 1.0:
-                last_display = t[-1]
-                message = 'Validation : {:.1f}% (timings : {:4.2f} {:4.2f})'
-                print(message.format(100 * i / config.validation_size,
-                                     1000 * (mean_dt[0]),
-                                     1000 * (mean_dt[1])))
-
-        t2 = time.time()
-
-        # Confusions for our subparts of validation set
-        Confs = np.zeros((len(predictions), nc_tot, nc_tot), dtype=np.int32)
-        for i, (preds, truth) in enumerate(zip(predictions, targets)):
-
-            # Confusions
-            Confs[i, :, :] = fast_confusion(truth, preds, val_loader.dataset.label_values).astype(np.int32)
-
-        t3 = time.time()
-
-        #######################################
-        # Results on this subpart of validation
-        #######################################
-
-        # Sum all confusions
-        C = np.sum(Confs, axis=0).astype(np.float32)
-
-        # Balance with real validation proportions
-        C *= np.expand_dims(val_loader.dataset.class_proportions / (np.sum(C, axis=1) + 1e-6), 1)
-
-        # Remove ignored labels from confusions
-        for l_ind, label_value in reversed(list(enumerate(val_loader.dataset.label_values))):
-            if label_value in val_loader.dataset.ignored_labels:
-                C = np.delete(C, l_ind, axis=0)
-                C = np.delete(C, l_ind, axis=1)
-
-        # Objects IoU
-        IoUs = IoU_from_confusions(C)
-
-        #####################################
-        # Results on the whole validation set
-        #####################################
-
-        t4 = time.time()
-
-        # Sum all validation confusions
-        C_tot = [np.sum(seq_C, axis=0) for seq_C in val_loader.dataset.val_confs if len(seq_C) > 0]
-        C_tot = np.sum(np.stack(C_tot, axis=0), axis=0)
-
-        if debug:
-            s = '\n'
-            for cc in C_tot:
-                for c in cc:
-                    s += '{:8.1f} '.format(c)
-                s += '\n'
-            print(s)
-
-        # Remove ignored labels from confusions
-        for l_ind, label_value in reversed(list(enumerate(val_loader.dataset.label_values))):
-            if label_value in val_loader.dataset.ignored_labels:
-                C_tot = np.delete(C_tot, l_ind, axis=0)
-                C_tot = np.delete(C_tot, l_ind, axis=1)
-
-        # Objects IoU
-        val_IoUs = IoU_from_confusions(C_tot)
-
-        t5 = time.time()
-
-        # Saving (optionnal)
-        if config.saving:
-
-            IoU_list = [IoUs, val_IoUs]
-            file_list = ['subpart_IoUs.txt', 'val_IoUs.txt']
-            for IoUs_to_save, IoU_file in zip(IoU_list, file_list):
-
-                # Name of saving file
-                test_file = join(config.saving_path, IoU_file)
-
-                # Line to write:
-                line = ''
-                for IoU in IoUs_to_save:
-                    line += '{:.3f} '.format(IoU)
-                line = line + '\n'
-
-                # Write in file
-                if exists(test_file):
-                    with open(test_file, "a") as text_file:
-                        text_file.write(line)
-                else:
-                    with open(test_file, "w") as text_file:
-                        text_file.write(line)
-
-        # Print instance mean
-        mIoU = 100 * np.mean(IoUs)
-        print('{:s} : subpart mIoU = {:.1f} %'.format(config.dataset, mIoU))
-        mIoU = 100 * np.mean(val_IoUs)
-        print('{:s} :     val mIoU = {:.1f} %'.format(config.dataset, mIoU))
-
-        t6 = time.time()
-
-        # Display timings
-        if debug:
-            print('\n************************\n')
-            print('Validation timings:')
-            print('Init ...... {:.1f}s'.format(t1 - t0))
-            print('Loop ...... {:.1f}s'.format(t2 - t1))
-            print('Confs ..... {:.1f}s'.format(t3 - t2))
-            print('IoU1 ...... {:.1f}s'.format(t4 - t3))
-            print('IoU2 ...... {:.1f}s'.format(t5 - t4))
-            print('Save ...... {:.1f}s'.format(t6 - t5))
-            print('\n************************\n')
-
-        return
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

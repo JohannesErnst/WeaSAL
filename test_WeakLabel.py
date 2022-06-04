@@ -7,19 +7,20 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Callable script to start a training on ModelNet40 dataset
+#      Callable script to test weak region-label classification networks on variable datasets
+#      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #      Hugues THOMAS - 06/03/2020
 #
-
-
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #           Imports and global variables
 #       \**********************************/
 #
+
+# Rename this script at some point if it can also be used for testing on pseudo labels -jer
 
 # Common libs
 import signal
@@ -29,13 +30,12 @@ import sys
 import torch
 
 # Dataset
-from datasets.ModelNet40 import *
-from datasets.S3DIS import *
+from datasets.Vaihingen3D_WeakLabel import *
 from torch.utils.data import DataLoader
 
 from utils.config import Config
-from utils.visualizer import ModelVisualizer
-from models.architectures import KPCNN, KPFCNN
+from utils.tester_WeakLabel import ModelTester
+from models.architectures import *
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -92,17 +92,17 @@ if __name__ == '__main__':
     #   Here you can choose which model you want to test with the variable test_model. Here are the possible values :
     #
     #       > 'last_XXX': Automatically retrieve the last trained model on dataset XXX
-    #       > 'results/Log_YYYY-MM-DD_HH-MM-SS': Directly provide the path of a trained model
+    #       > '(old_)results/Log_YYYY-MM-DD_HH-MM-SS': Directly provide the path of a trained model
 
-    chosen_log = 'results/Log_2020-04-23_19-42-18'
+    chosen_log = 'results/Log_2022-06-04_15-35-23'
 
     # Choose the index of the checkpoint to load OR None if you want to load the current checkpoint
-    chkp_idx = None
+    chkp_idx = -1
 
-    # Eventually you can choose which feature is visualized (index of the deform convolution in the network)
-    deform_idx = 0
+    # Choose to test on validation or test split
+    on_val = True
 
-    # Deal with 'last_XXX' choices
+    # Deal with 'last_XXXXXX' choices
     chosen_log = model_choice(chosen_log)
 
     ############################
@@ -140,10 +140,13 @@ if __name__ == '__main__':
 
     # Change parameters for the test here. For example, you can stop augmenting the input data.
 
-    config.augment_noise = 0.0001
-    config.batch_num = 1
-    config.in_radius = 2.0
-    config.input_threads = 0
+    #config.augment_noise = 0.0001
+    #config.augment_symmetries = False
+    #config.batch_num = 3
+    #config.in_radius = 4
+    config.validation_size = 200
+    config.input_threads = 10
+    config.dropout = 0
 
     ##############
     # Prepare Data
@@ -153,15 +156,21 @@ if __name__ == '__main__':
     print('Data Preparation')
     print('****************')
 
+    if on_val:
+        set = 'validation'
+    else:
+        set = 'test'
+
     # Initiate dataset
-    if config.dataset.startswith('ModelNet40'):
-        test_dataset = ModelNet40Dataset(config, train=False)
-        test_sampler = ModelNet40Sampler(test_dataset)
-        collate_fn = ModelNet40Collate
-    elif config.dataset == 'S3DIS':
-        test_dataset = S3DISDataset(config, set='validation', use_potentials=True)
-        test_sampler = S3DISSampler(test_dataset)
-        collate_fn = S3DISCollate
+    if config.dataset == 'Vaihingen3D':
+        test_dataset = Vaihingen3DWLDataset(config, set=set, use_potentials=True)
+        test_sampler = Vaihingen3DWLSampler(test_dataset)
+        collate_fn = Vaihingen3DWLCollate
+    elif config.dataset == 'DALES':
+        print("Not implemented")
+        # test_dataset = DALESDataset(config, set=set, use_potentials=True)
+        # test_sampler = DALESSampler(test_dataset)
+        # collate_fn = DALESCollate
     else:
         raise ValueError('Unsupported dataset : ' + config.dataset)
 
@@ -179,24 +188,25 @@ if __name__ == '__main__':
     print('\nModel Preparation')
     print('*****************')
 
-    # Define network model
+    # Define network model (must match training network model)
     t1 = time.time()
-    if config.dataset_task == 'classification':
-        net = KPCNN(config)
-    elif config.dataset_task in ['cloud_segmentation', 'slam_segmentation']:
-        net = KPFCNN(config, test_dataset.label_values, test_dataset.ignored_labels)
+    config.model_name = 'KPFCNN_mprm_ele'
+    if config.model_name == 'KPFCNN_mprm':
+        net = KPFCNN_mprm(config, test_dataset.label_values, test_dataset.ignored_labels)
+    elif config.model_name == 'KPFCNN_mprm_ele':
+        net = KPFCNN_mprm_ele(config, test_dataset.label_values, test_dataset.ignored_labels) 
     else:
-        raise ValueError('Unsupported dataset_task for deformation visu: ' + config.dataset_task)
+        raise ValueError('Unsupported model for testing: ' + config.model_name)
 
     # Define a visualizer class
-    visualizer = ModelVisualizer(net, config, chkp_path=chosen_chkp, on_gpu=False)
+    tester = ModelTester(net, chkp_path=chosen_chkp)
     print('Done in {:.1f}s\n'.format(time.time() - t1))
 
-    print('\nStart visualization')
-    print('*******************')
+    print('\nStart test')
+    print('**********\n')
 
-    # Training
-    visualizer.show_deformable_kernels(net, test_loader, config, deform_idx)
-
-
-
+    # Testing
+    if config.dataset_task == 'cloud_segmentation':
+        tester.cloud_segmentation_test(net, test_loader, config, num_votes=10)
+    else:
+        raise ValueError('Unsupported dataset_task for testing: ' + config.dataset_task)

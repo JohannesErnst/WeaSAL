@@ -7,14 +7,13 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Callable script to start a training on ModelNet40 dataset
+#      Callable script to test networks on variable datasets
+#      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #      Hugues THOMAS - 06/03/2020
 #
-
-
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #           Imports and global variables
@@ -29,13 +28,11 @@ import sys
 import torch
 
 # Dataset
-from datasets.ModelNet40 import *
-from datasets.S3DIS import *
-from datasets.SemanticKitti import *
+from datasets.Vaihingen3D import *
 from torch.utils.data import DataLoader
 
 from utils.config import Config
-from utils.tester import ModelTester
+from utils.tester_WeakLabel import ModelTester
 from models.architectures import KPCNN, KPFCNN
 
 
@@ -95,13 +92,13 @@ if __name__ == '__main__':
     #       > 'last_XXX': Automatically retrieve the last trained model on dataset XXX
     #       > '(old_)results/Log_YYYY-MM-DD_HH-MM-SS': Directly provide the path of a trained model
 
-    chosen_log = 'results/Light_KPFCNN'
+    chosen_log = 'results/Log_2022-05-05_14-21-26'
 
     # Choose the index of the checkpoint to load OR None if you want to load the current checkpoint
     chkp_idx = -1
 
     # Choose to test on validation or test split
-    on_val = True
+    on_val = False
 
     # Deal with 'last_XXXXXX' choices
     chosen_log = model_choice(chosen_log)
@@ -162,18 +159,15 @@ if __name__ == '__main__':
         set = 'test'
 
     # Initiate dataset
-    if config.dataset == 'ModelNet40':
-        test_dataset = ModelNet40Dataset(config, train=False)
-        test_sampler = ModelNet40Sampler(test_dataset)
-        collate_fn = ModelNet40Collate
-    elif config.dataset == 'S3DIS':
-        test_dataset = S3DISDataset(config, set='validation', use_potentials=True)
-        test_sampler = S3DISSampler(test_dataset)
-        collate_fn = S3DISCollate
-    elif config.dataset == 'SemanticKitti':
-        test_dataset = SemanticKittiDataset(config, set=set, balance_classes=False)
-        test_sampler = SemanticKittiSampler(test_dataset)
-        collate_fn = SemanticKittiCollate
+    if config.dataset == 'Vaihingen3D':
+        test_dataset = Vaihingen3DDataset(config, set=set, use_potentials=True)
+        test_sampler = Vaihingen3DSampler(test_dataset)
+        collate_fn = Vaihingen3DCollate
+    elif config.dataset == 'DALES':
+        print("Not implemented")
+        # test_dataset = DALESDataset(config, set=set, use_potentials=True)
+        # test_sampler = DALESSampler(test_dataset)
+        # collate_fn = DALESCollate
     else:
         raise ValueError('Unsupported dataset : ' + config.dataset)
 
@@ -211,7 +205,7 @@ if __name__ == '__main__':
     if config.dataset_task == 'classification':
         tester.classification_test(net, test_loader, config)
     elif config.dataset_task == 'cloud_segmentation':
-        tester.cloud_segmentation_test(net, test_loader, config)
+        tester.cloud_segmentation_test(net, test_loader, config, num_votes=0)
     elif config.dataset_task == 'slam_segmentation':
         tester.slam_segmentation_test(net, test_loader, config)
     else:

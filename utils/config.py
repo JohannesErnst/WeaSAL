@@ -8,6 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #      Configuration class
+#      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -263,8 +264,20 @@ class Config:
                 elif line_info[0] == 'class_w':
                     self.class_w = [float(w) for w in line_info[2:]]
 
+                elif line_info[0] == 'dropout':
+                    setattr(self, line_info[0], line_info[2]) 
+                
+                elif line_info[0] == 'model_name':
+                    setattr(self, line_info[0], line_info[2])
+
+                elif line_info[0] == 'loss_type':
+                    setattr(self, line_info[0], line_info[2])
+
                 elif hasattr(self, line_info[0]):
-                    attr_type = type(getattr(self, line_info[0]))
+                    if len(line_info[2].split('.')) == 2:
+                        attr_type = type(getattr(self, 'first_subsampling_dl')) # set as float
+                    else:
+                        attr_type = type(getattr(self, line_info[0]))
                     if attr_type == bool:
                         setattr(self, line_info[0], attr_type(int(line_info[2])))
                     else:
@@ -345,7 +358,6 @@ class Config:
             text_file.write('\n')
             text_file.write('grad_clip_norm = {:f}\n\n'.format(self.grad_clip_norm))
 
-
             text_file.write('augment_symmetries =')
             for a in self.augment_symmetries:
                 text_file.write(' {:d}'.format(int(a)))
@@ -378,5 +390,33 @@ class Config:
             else:
                 text_file.write('epoch_steps = {:d}\n'.format(self.epoch_steps))
             text_file.write('validation_size = {:d}\n'.format(self.validation_size))
-            text_file.write('checkpoint_gap = {:d}\n'.format(self.checkpoint_gap))
+            text_file.write('checkpoint_gap = {:d}\n\n'.format(self.checkpoint_gap))
+
+            # Other parameters
+            text_file.write('# Other parameters\n')
+            text_file.write('# *******************\n\n')
+            
+            if hasattr(self, 'sub_radius'):
+                text_file.write('sub_radius = {:.6f}\n'.format(self.sub_radius))
+            if hasattr(self, 'xyz_offset'):
+                text_file.write('xyz_offset =')
+                for a in self.xyz_offset:
+                    text_file.write(' {:.6f}'.format(a))
+            text_file.write('\n')
+            if hasattr(self, 'model_name'):                         
+                text_file.write('model_name = {:s}\n'.format(self.model_name))
+            if hasattr(self, 'loss_type'):                          # check the following hasattr whether to delete -jer
+                text_file.write('loss_type = {:s}\n'.format(self.loss_type))       
+            if hasattr(self, 'contrast_start'):
+                text_file.write('contrast_start = {:.6f}\n'.format(self.contrast_start))      
+            if hasattr(self, 'contrast_thd'):
+                text_file.write('contrast_thd = {:.6f}\n'.format(self.contrast_thd))       
+            if hasattr(self, 'anchor_method'):
+                text_file.write('anchor_method = {:s}\n'.format(self.anchor_method))                                                  
+            if hasattr(self, 'model_n'):
+                text_file.write('model_n = {:s}\n'.format(self.model_n))        
+            # if hasattr(self, 'slc_con'):
+            #     text_file.write('slc_con = {:.3f}\n'.format(self.slc_con))  
+            if hasattr(self, 'dropout'):
+                text_file.write('dropout = {:.3f}\n'.format(self.dropout))
 
