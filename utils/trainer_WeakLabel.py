@@ -194,7 +194,7 @@ class ModelTrainer:
                 if config.loss_type == 'region_mprm_loss':
                     loss = net.region_mprm_loss(self.cam, batch.region, batch.region_lb, batch.lengths[0])
                 else:
-                    loss = net.class_logits_loss(self.class_logits, batch.cl_lb)
+                    loss = net.class_logits_loss(self.class_logits, batch.cloud_lb)
                 acc = net.accuracy_logits(self.logits, batch.labels)
 
                 t += [time.time()]

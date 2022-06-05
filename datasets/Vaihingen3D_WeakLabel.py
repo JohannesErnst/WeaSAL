@@ -1330,9 +1330,9 @@ class Vaihingen3DWLCustomBatch:
         self.input_inds = torch.from_numpy(input_list[ind])
         ind += 1
         if len(input_list) == 27:
-            self.cl_lb = torch.from_numpy(input_list[ind])
+            self.cloud_lb = torch.from_numpy(input_list[ind])
             ind += 1
-            self.cl_all_lb = torch.from_numpy(input_list[ind])            
+            self.cloud_all_lb = torch.from_numpy(input_list[ind])            
             ind += 1
             self.region = input_list[ind]
             ind += 1
@@ -1359,10 +1359,10 @@ class Vaihingen3DWLCustomBatch:
         self.cloud_inds = self.cloud_inds.pin_memory()
         self.center_inds = self.center_inds.pin_memory()
         self.input_inds = self.input_inds.pin_memory()
-        if hasattr(self, 'cl_lb'):
-            self.cl_lb = self.cl_lb.pin_memory()
-        if hasattr(self, 'cl_all_lb'):
-            self.cl_all_lb = self.cl_all_lb.pin_memory()
+        if hasattr(self, 'cloud_lb'):
+            self.cloud_lb = self.cloud_lb.pin_memory()
+        if hasattr(self, 'cloud_all_lb'):
+            self.cloud_all_lb = self.cloud_all_lb.pin_memory()
         if hasattr(self, 'center_pts'):    
             self.center_pts = self.center_pts.pin_memory()
         
@@ -1382,10 +1382,10 @@ class Vaihingen3DWLCustomBatch:
         self.cloud_inds = self.cloud_inds.to(device)
         self.center_inds = self.center_inds.to(device)
         self.input_inds = self.input_inds.to(device)
-        if hasattr(self, 'cl_lb'):
-            self.cl_lb = self.cl_lb.to(device)
-        if hasattr(self, 'cl_all_lb'):
-            self.cl_all_lb = self.cl_all_lb.to(device)
+        if hasattr(self, 'cloud_lb'):
+            self.cloud_lb = self.cloud_lb.to(device)
+        if hasattr(self, 'cloud_all_lb'):
+            self.cloud_all_lb = self.cloud_all_lb.to(device)
         if hasattr(self, 'center_pts'):
             self.center_pts = self.center_pts.to(device)
         

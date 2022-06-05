@@ -624,9 +624,11 @@ class KPFCNN_mprm(nn.Module):
         # Choose segmentation loss          # clear this part up once it is running. Might try to change this for better results though (look at original KPConv) -jer
         if len(config.class_w) > 0:
             class_w = torch.from_numpy(np.array(config.class_w, dtype=np.float32))
-            self.criterion = torch.nn.CrossEntropyLoss(ignore_index=-1) #weight=class_w, 
+            self.criterion = torch.nn.CrossEntropyLoss(weight=class_w, ignore_index=-1)
+            self.criterion_multi = torch.nn.BCEWithLogitsLoss(weight=class_w)
         else:           
             self.criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
+            self.criterion_multi = torch.nn.BCEWithLogitsLoss()
         self.deform_fitting_mode = config.deform_fitting_mode
         self.deform_fitting_power = config.deform_fitting_power
         self.deform_lr_factor = config.deform_lr_factor
@@ -634,10 +636,8 @@ class KPFCNN_mprm(nn.Module):
         self.output_loss = 0
         self.reg_loss = 0
         self.l1 = nn.L1Loss()
-        class_w = torch.from_numpy(np.array(config.class_w, dtype=np.float32))
-        self.criterion_multi = torch.nn.BCEWithLogitsLoss() #weight=class_w
-        # self.criterion_sia = torch.nn.CrossEntropyLoss(weight=class_w)
         self.register_hooks()
+
         return
 
     def register_hooks(self):
@@ -658,14 +658,14 @@ class KPFCNN_mprm(nn.Module):
         # Get input features
         x = batch.features.clone().detach()
 
-        # Loop over consecutive blocks
+        # Loop over consecutive encoder blocks
         skip_x = []
         for block_i, block_op in enumerate(self.encoder_blocks):
             if block_i in self.encoder_skips:
                 skip_x.append(x)
             x = block_op(x, batch)
             
-        # Combine attention modules and get maximum 
+        # Combine attention modules and save logits
         spa_att, cha_att, no_att, dual_att = self.multi_att(x, batch)
 
         no_att_cla = self.no_ga(no_att, batch)
@@ -674,75 +674,42 @@ class KPFCNN_mprm(nn.Module):
         cha_att_cla = self.cha_ga(cha_att, batch)  
         
         cla_logits = [no_att_cla, dual_att_cla, spa_att_cla, cha_att_cla]
-               
-        x = torch.max(no_att, dual_att)
-        x = torch.max(x, spa_att)
-        x = torch.max(x, cha_att)
         
+        # Loop over consecutive decoder blocks
         for block_i, block_op in enumerate(self.decoder_blocks):
             no_att = block_op(no_att, batch)
             dual_att = block_op(dual_att, batch)
             spa_att = block_op(spa_att, batch)
             cha_att = block_op(cha_att, batch)
-            x = block_op(x, batch)
+
+        # Element-wise maximum to get pseudo labels
+        x = torch.max(no_att, dual_att)
+        x = torch.max(x, spa_att)
+        x = torch.max(x, cha_att)
             
         cam = [no_att, dual_att, spa_att, cha_att]
         
         return x, cla_logits, cam
-
-    def loss(self, outputs, labels):
-        """
-        Runs the loss on outputs of the model
-        :param outputs: logits
-        :param labels: labels
-        :return: loss
-        """
-
-        # Set all ignored labels to -1 and correct the other label to be in [0, C-1] range
-        target = - torch.ones_like(labels)
-        for i, c in enumerate(self.valid_labels):
-            target[labels == c] = i
-
-        # Reshape to have a minibatch size of 1
-        outputs = torch.transpose(outputs, 0, 1)
-        outputs = outputs.unsqueeze(0)
-        target = target.unsqueeze(0)
-
-        # Cross entropy loss
-        self.output_loss = self.criterion(outputs, target)
-
-        # Regularization of deformable offsets
-        if self.deform_fitting_mode == 'point2point':
-            self.reg_loss = p2p_fitting_regularizer(self)
-        elif self.deform_fitting_mode == 'point2plane':
-            raise ValueError('point2plane fitting mode not implemented yet.')
-        else:
-            raise ValueError('Unknown fitting mode: ' + self.deform_fitting_mode)
-
-        # Combined loss
-        return self.output_loss + self.reg_loss
    
-    def class_logits_loss(self, class_logits, cl_lb):
+    def class_logits_loss(self, class_logits, cloud_lb):
+        # I think this loss can be deleted at some point because it was used by Wei et al
+        # and doesn't consider the overlap region loss. If I delete this, I may completely remove
+        # the variables cloud_lb and cloud_all_lb from Vaihingen3D_WeakLabel because they are only
+        # weak labels used for the whole input sphere (in_radius) and not the smaller subclouds 
+        # (i.e. subradius). Then only the variables region_lb and region will be left. This should
+        # be a little less confusing in Vaihingen3d_WeakLabel.py. -jer
         """
         Runs the BCEWithLogitsLoss (binary cross entropy) on outputs of the model
         :param class_logits: logits
-        :param cl_lb: labels
+        :param cloud_lb: labels
         :return: loss
         """
 
-        # Set all ignored labels to -1 and correct the other label to be in [0, C-1] range
-        target = - torch.ones_like(cl_lb)
-        for i, c in enumerate(self.valid_labels):
-            target[cl_lb == c] = i
-
-        # Reshape to have a minibatch size of 1
-        target = target.unsqueeze(0)
-
         # BCEWithLogitsLoss on class logits
-        self.output_loss1 = self.criterion_multi(class_logits[0],cl_lb)
-        self.output_loss2 = self.criterion_multi(class_logits[1],cl_lb)
-        self.output_loss3 = self.criterion_multi(class_logits[2],cl_lb)
-        self.output_loss4 = self.criterion_multi(class_logits[3],cl_lb)        
+        self.output_loss1 = self.criterion_multi(class_logits[0],cloud_lb)
+        self.output_loss2 = self.criterion_multi(class_logits[1],cloud_lb)
+        self.output_loss3 = self.criterion_multi(class_logits[2],cloud_lb)
+        self.output_loss4 = self.criterion_multi(class_logits[3],cloud_lb)        
         
         # Regularization of deformable offsets
         if self.deform_fitting_mode == 'point2point':
@@ -973,7 +940,7 @@ class KPFCNN_mprm_ele(KPFCNN_mprm):
         # Include elevation attention
         ele_down = batch.points[2][:,-1].unsqueeze_(-1).clone().detach()
 
-        # Loop over consecutive blocks
+        # Loop over consecutive encoder blocks
         skip_x = []
         for block_i, block_op in enumerate(self.encoder_blocks):
             if block_i in self.encoder_skips:
@@ -981,20 +948,24 @@ class KPFCNN_mprm_ele(KPFCNN_mprm):
             x = block_op(x, batch)
         x = self.ele_head(x, ele_down, batch)    
         
-        spa_att, cha_att, no_att, dual_att  = self.multi_att(x, batch)
+        # Combine attention modules and save logits
+        spa_att, cha_att, no_att, dual_att = self.multi_att(x, batch)
             
         no_att_cla = self.no_ga(no_att, batch)
         dual_att_cla = self.da_ga(dual_att, batch)
-        spa_att_cla = self.spa_ga(spa_att, batch)               # why are they leaving out the channel attention block here? -jer
-        
-        cla_logits = [no_att_cla, dual_att_cla, spa_att_cla]
+        spa_att_cla = self.spa_ga(spa_att, batch)
+        cha_att_cla = self.cha_ga(cha_att, batch)
+
+        cla_logits = [no_att_cla, dual_att_cla, spa_att_cla, cha_att_cla]
                
+        # Loop over consecutive decoder blocks
         for block_i, block_op in enumerate(self.decoder_blocks):
             no_att = block_op(no_att, batch)
             dual_att = block_op(dual_att, batch)
             spa_att = block_op(spa_att, batch)
             cha_att = block_op(cha_att, batch)
             
+        # Element-wise maximum to get pseudo labels
         x = torch.max(no_att, dual_att)
         x = torch.max(x, spa_att)
         x = torch.max(x, cha_att)
