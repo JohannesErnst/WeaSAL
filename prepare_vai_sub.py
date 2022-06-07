@@ -75,7 +75,7 @@ for i, tree in enumerate(input_trees):
     anchor, anchor_tree, anchors_dict, achor_lb = update_anchors(
         tree, anchor, anchor_tree, anchors_dict, achor_lb, sub_radius)
 
-    # Save anchors              # do we even need this? Variable is not used anymore. MAybe if we use multiple clouds the next part wont with all_class_lbs wont work... -jer
+    # Save anchors              # do we even need this? Variable is not used anymore. MAybe if we use multiple clouds the next part with all_class_lbs wont work... -jer
     # c_name = cloud_names[i]
     # all_data[c_name] = anchor, anchor_tree, anchors_dict, achor_lb
     

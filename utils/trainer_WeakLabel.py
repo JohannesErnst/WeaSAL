@@ -195,7 +195,7 @@ class ModelTrainer:
                     loss = net.region_mprm_loss(self.cam, batch.region, batch.region_lb, batch.lengths[0])
                 else:
                     loss = net.class_logits_loss(self.class_logits, batch.cloud_lb)
-                acc = net.accuracy_logits(self.logits, batch.labels)
+                acc = net.accuracy(self.logits, batch.labels)
 
                 t += [time.time()]
 
@@ -235,7 +235,7 @@ class ModelTrainer:
                         message = '{:d} {:d} {:.3f} {:.3f} {:.3f} {:.3f}\n'
                         file.write(message.format(self.epoch,
                                                   self.step,
-                                                  net.output_loss,          # this is net.item in Lin et al. change if raises error -jer
+                                                  net.output_loss,
                                                   net.reg_loss,
                                                   acc,
                                                   t[-1] - t0))
@@ -490,10 +490,6 @@ class ModelTrainer:
                 makedirs(val_path)
             files = val_loader.dataset.files
             Confs = np.zeros((config.num_classes, config.num_classes), dtype=np.int32)
-            if config.dataset in ['rotterdam', 'Dales']:
-                # this needs to be changed since i don't use rotterdam. But do we even get here? -jer
-                exit("Stop here and look into code -jer")
-                Confs = np.zeros((config.num_classes+1, config.num_classes+1), dtype=np.int32)
                 
             for i, file_path in enumerate(files):
 

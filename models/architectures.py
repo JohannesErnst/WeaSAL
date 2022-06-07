@@ -402,23 +402,23 @@ class KPFCNN(nn.Module):
 
         return correct / total
 
-    def contrast_loss_w(self, outputs, labels, config, threshold=0.4, gt=None):
+    def contrast_loss(self, outputs, labels, config, threshold=0.2):
             """
             Runs contrastive loss on outputs of the model
             :param outputs: logits predicted by the network
             :param labels: labels
             :return: loss
             """
-
+            # Check this function and append comments when debugging -jer
             # Define parameter
             temperature = 0.1
             base_temperature = 1
             self.pts_loss = 0
             self.pts_loss_self = 0
-            slc_con = 1000
+            slc_con = 1000          # what is this parameter? -jer
             N = outputs.shape[0]        
             tensor_0 = torch.tensor(0).float().cuda()
-            threshold = config.contrast_thd 
+            threshold = config.contrast_thd / 100
             
             # Get probabilities
             prob = torch.nn.Softmax(1)(outputs) 
@@ -427,7 +427,7 @@ class KPFCNN(nn.Module):
             # Gather all labeled points and confident unlabeled points
             label_id = labels < 10
             certain_label = pseudo_logits > threshold
-            certain_label = (certain_label + label_id) > 0 
+            certain_label = (certain_label + label_id) > 0
 
             # Get pseudo labels
             pseudo_lbs = torch.argmax(prob, dim=1)
@@ -464,9 +464,7 @@ class KPFCNN(nn.Module):
             mask_certaion = certain_label_slc.unsqueeze(0) == certain_label.unsqueeze(-1) 
             
             pos_mask = pseudo_label_slc.unsqueeze(0) == pseudo_lbs.unsqueeze(-1) * mask1 * mask_certaion
-            # outputs = F.normalize(outputs, dim=1)               # what is F? Maybe this should be nn.functionals.normalize -jer
-            outputs = nn.functionals.normalize.normalize(outputs, dim=1)    
-            exit("Stop, once the code reaches this part double check the F.normalize part. Does it work (in Stefans code)? -jer")
+            outputs = nn.functionals.normalize(outputs, dim=1)    
             x_slc = outputs[slc_idx]
             
             mul = torch.div(
@@ -621,7 +619,7 @@ class KPFCNN_mprm(nn.Module):
         # List of valid labels (those not ignored in loss)
         self.valid_labels = np.sort([c for c in lbl_values if c not in ign_lbls])
 
-        # Choose segmentation loss          # clear this part up once it is running. Might try to change this for better results though (look at original KPConv) -jer
+        # Choose segmentation loss
         if len(config.class_w) > 0:
             class_w = torch.from_numpy(np.array(config.class_w, dtype=np.float32))
             self.criterion = torch.nn.CrossEntropyLoss(weight=class_w, ignore_index=-1)
@@ -764,45 +762,24 @@ class KPFCNN_mprm(nn.Module):
 
         return self.output_loss 
 
-    def accuracy(self, outputs, labels):        
-        # These 2 accuracy functions are definitely sus. I think I only need one of them. 
-        # First one is used for pseudo label and second one for weak label script. 
-        # Only difference is the dim = 1 / -1. 
-        # This only makes a difference when logits dimension is 3D then dim -1 gives the same 
-        # results as dim 2 and dim -2 goives the same result as dim 1... 
-        # Debug this once pseudo label is running -jer
+    def accuracy(self, logits, labels):        
         """ 
         Computes accuracy of the current batch
-        :param outputs: logits predicted by the network
+        :param logits: logits output predicted by the network
         :param labels: labels
         :return: accuracy value
         """
+
+        # Check dimension
+        if not len(logits.size()) == 2:
+            raise ValueError('Wrong logits output dimension: Expected 2, got ' + str(len(logits.size())))
 
         # Set all ignored labels to -1 and correct the other label to be in [0, C-1] range
         target = - torch.ones_like(labels)
         for i, c in enumerate(self.valid_labels):
             target[labels == c] = i
 
-        predicted = torch.argmax(outputs.data, dim=1)
-        total = target.size(0)
-        correct = (predicted == target).sum().item()
-
-        return correct / total
-
-    def accuracy_logits(self, logits, labels):
-        """
-        Computes accuracy of the current batch
-        :param logits: logits predicted by the network
-        :param labels: labels
-        :return: accuracy value
-        """
-
-        # Set all ignored labels to -1 and correct the other label to be in [0, C-1] range
-        target = - torch.ones_like(labels)
-        for i, c in enumerate(self.valid_labels):
-            target[labels == c] = i
-
-        predicted = torch.argmax(logits, dim=-1)
+        predicted = torch.argmax(logits, dim=1)
         total = target.size(0)
         correct = (predicted == target).sum().item()
 

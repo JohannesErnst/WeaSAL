@@ -132,7 +132,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         # Prepare ply files
         ###################
 
-        self.prepare_Vaihingen3DWL_ply()
+        self.prepare_Vaihingen3D_ply()
 
         ################
         # Load ply files
@@ -270,12 +270,13 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         ci_list = []
         s_list = []
         R_list = []
-        batch_n = 0
         cl_list=[]
         cla_list=[]
         region_list = []
         region_lb_list = []
         cen_list = []
+        batch_n = 0
+        failed_attempts = 0
 
         info = get_worker_info()
         if info is not None:
@@ -394,14 +395,13 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             # Number of collected points in input region
             n = input_inds.shape[0]
 
-            # What is this for? -jer
-            # In original KPConv this is a safe check for empty spheres 
+            # Safe check for empty spheres
             if n < 2:
-                self.potentials[cloud_ind][point_ind] += 10
-                min_ind = torch.argmin(self.potentials[cloud_ind])
-                self.min_potentials[[cloud_ind]] = self.potentials[cloud_ind][min_ind]
-                self.argmin_potentials[[cloud_ind]] = min_ind   # find the new point with minimum potential
-                exit("Look at comment above -jer")
+                failed_attempts += 1
+                if failed_attempts > 100 * self.config.batch_num:
+                    raise ValueError('It seems this dataset only containes empty input spheres')
+                t += [time.time()]
+                t += [time.time()]
                 continue
 
             # Collect weak cloud-labels and colors
@@ -451,7 +451,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             # Update batch size and stop when batch is full
             if self.set == 'training':
                 batch_n += 1
-                if batch_n > 1:
+                if batch_n > 1: # hier was mit batch_num -jer
                     break
             else:
                 batch_n += n
@@ -481,7 +481,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         if self.config.in_features_dim == 1:
             pass
         elif self.config.in_features_dim == 2:
-            stacked_features = np.hstack((stacked_features, features[:, :1]))        
+            stacked_features = np.hstack((stacked_features, features[:, :1]))
         elif self.config.in_features_dim == 4:
             stacked_features = np.hstack((stacked_features, features[:, :3]))
         else:
@@ -573,7 +573,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             print('\n************************\n')
         return input_list
 
-    def prepare_Vaihingen3DWL_ply(self):
+    def prepare_Vaihingen3D_ply(self):
         # Preparing files by reducing coordinates and converting to float32
 
         print('\nPreparing ply files')
@@ -713,7 +713,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             self.input_colors += [sub_colors]
             self.input_labels += [sub_labels]
 
-            size = sub_colors.shape[0] * 4 * 7
+            size = sub_colors.shape[0] * 4 * 5
             print('{:.1f} MB loaded in {:.1f}s'.format(size * 1e-6, time.time() - t0))
 
         ############################
@@ -740,6 +740,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 
                 # Check if inputs have already been computed
                 if exists(coarse_KDTree_file):
+                    
                     # Read pkl with search tree
                     with open(coarse_KDTree_file, 'rb') as f:
                         search_tree = pickle.load(f)

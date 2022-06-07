@@ -42,7 +42,7 @@ from models.architectures import *
 #       \******************/
 #
 
-class Vaihingen3DConfig(Config):
+class Vaihingen3DWLConfig(Config):
     """
     Override the parameters you want to modify for this dataset
     """
@@ -145,13 +145,13 @@ class Vaihingen3DConfig(Config):
     batch_num = 2
 
     # Number of steps per epochs
-    epoch_steps = 600
+    epoch_steps = 100
 
     # Number of validation examples per epoch
     validation_size = 50
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 10
+    checkpoint_gap = 1
 
     # Augmentations
     augment_scale_anisotropic = True
@@ -231,7 +231,7 @@ if __name__ == '__main__':
     print('****************')
 
     # Initialize configuration class
-    config = Vaihingen3DConfig()
+    config = Vaihingen3DWLConfig()
     if previous_training_path:
         config.load(os.path.join('results', previous_training_path))
         config.saving_path = None

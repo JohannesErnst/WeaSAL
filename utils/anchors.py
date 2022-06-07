@@ -70,25 +70,6 @@ def get_anchors(points, sub_radius, xyz_offset=[0,0,0], method='full'):
                     
     return np.array(n_anchors)
 
-# def remove_empty_anchors(input_tree, anchors, radius):
-#     """
-#     Return anchors (i.e. subregions) that have more than 3 points inside
-#     I think this function is actually never used. remove if never used -jer
-#     """
-#     clean_anchors = []
-#     for i in range(anchors.shape[0]):
-
-#         # Collect number of points in subregion
-#         center_point = anchors[i].reshape(1, -1)
-#         input_inds = input_tree.query_radius(center_point, r=radius)[0]
-#         n = input_inds.shape[0]
-
-#         # Save anchors with more than 3 points
-#         if n > 2 :
-#             clean_anchors += [anchors[i]]
-
-#     return np.array(clean_anchors)
-
 def anchors_with_points(input_tree, anchors, lbs, radius, n_class):
     # This was once named anchors_part_lbs. Just fyi when trying to find the function -jer
     """

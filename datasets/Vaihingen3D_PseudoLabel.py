@@ -7,7 +7,7 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Class handling Vaihingen dataset.
+#      Class handling Vaihingen dataset with pseudo labels.
 #      Implements a Dataset, a Sampler, and a collate function
 #      - adapted by Johannes Ernst
 #
@@ -41,42 +41,42 @@ from utils.mayavi_visu import *
 from datasets.common import grid_subsampling
 from utils.config import bcolors
 
-
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #           Dataset class definition
 #       \******************************/
 
 
-class Vaihingen3DDataset(PointCloudDataset):
+class Vaihingen3DPLDataset(PointCloudDataset):
     """Class to handle Vaihingen dataset."""
 
     def __init__(self, config, set='training', use_potentials=True, load_data=True):
         """
         This dataset is small enough to be stored in-memory, so load all point clouds here
         """
-        PointCloudDataset.__init__(self, 'Vaihingen3D')
+        PointCloudDataset.__init__(self, 'Vaihingen3DPL')
 
         ############
         # Parameters
         ############
 
         # Dict from labels to names
-        self.label_to_names = {0: 'Powerline',
-                               1: 'LowVegetation',
-                               2: 'ImperviousSurfaces',
-                               3: 'Car',
-                               4: 'Fence/Hedge',
-                               5: 'Roof',
-                               6: 'Facade',
-                               7: 'Shrub',
-                               8: 'Tree'}
+        self.label_to_names = {0:  'Powerline',
+                               1:  'LowVegetation',
+                               2:  'ImperviousSurfaces',
+                               3:  'Car',
+                               4:  'Fence/Hedge',
+                               5:  'Roof',
+                               6:  'Facade',
+                               7:  'Shrub',
+                               8:  'Tree',
+                               10: 'Ignore'}
 
         # Initialize a bunch of variables concerning class labels
         self.init_labels()
 
         # List of classes ignored during training (can be empty)
-        self.ignored_labels = np.array([])
+        self.ignored_labels = np.array([10])
 
         # Dataset folder
         self.path = 'data/Vaihingen3D'
@@ -108,10 +108,8 @@ class Vaihingen3DDataset(PointCloudDataset):
             ply_path = join(self.path, self.train_path)
 
         # Define datasets and splits
-        self.cloud_names = ['Vaihingen3D_Traininig_train', 'Vaihingen3D_Traininig_val', 'Vaihingen3D_EVAL_WITH_REF']
-        # self.cloud_names = ['Vaihingen3D_Traininig_val', 'Vaihingen3D_Traininig_val']
+        self.cloud_names = ['Vaihingen3D_Training', 'Vaihingen3D_Training', 'Vaihingen3D_Testing']
         self.all_splits = [0, 1, 2]
-        # self.all_splits = [0, 1]
         self.validation_split = 1
         self.test_split = 2
 
@@ -121,7 +119,7 @@ class Vaihingen3DDataset(PointCloudDataset):
         elif self.set in ['validation', 'test', 'ERF']:
             self.epoch_n = config.validation_size * config.batch_num
         else:
-            raise ValueError('Unknown set for Vaihingen3D data: ', self.set)
+            raise ValueError('Unknown set for Vaihingen3DPL data: ', self.set)
 
         # Stop data is not needed
         if not load_data:
@@ -150,7 +148,7 @@ class Vaihingen3DDataset(PointCloudDataset):
                 if self.all_splits[i] == self.validation_split:
                     self.files += [join(ply_path, f + '.ply')]
             else:
-                raise ValueError('Unknown set for Vaihingen3D data: ', self.set)
+                raise ValueError('Unknown set for Vaihingen3DPL data: ', self.set)
 
         if self.set == 'training':
             self.cloud_names = [f for i, f in enumerate(self.cloud_names)
@@ -259,6 +257,7 @@ class Vaihingen3DDataset(PointCloudDataset):
         s_list = []
         R_list = []
         batch_n = 0
+        failed_attempts = 0
 
         info = get_worker_info()
         if info is not None:
@@ -346,6 +345,15 @@ class Vaihingen3DDataset(PointCloudDataset):
             # Number collected
             n = input_inds.shape[0]
 
+            # Safe check for empty spheres
+            if n < 2:
+                failed_attempts += 1
+                if failed_attempts > 100 * self.config.batch_num:
+                    raise ValueError('It seems this dataset only containes empty input spheres')
+                t += [time.time()]
+                t += [time.time()]
+                continue
+
             # Collect labels and colors
             input_points = (points[input_inds] - center_point).astype(np.float32)
             input_colors = self.input_colors[cloud_ind][input_inds]
@@ -405,16 +413,16 @@ class Vaihingen3DDataset(PointCloudDataset):
         scales = np.array(s_list, dtype=np.float32)
         rots = np.stack(R_list, axis=0)
 
-        # Input features (4 means [ones  intensity absoluteHeight reducedHeight]) double check and clean next lines -jer
+        # Input features (4 means [ones  intensity absoluteHeight reducedHeight])
         stacked_features = np.ones_like(stacked_points[:, :1], dtype=np.float32)
         if self.config.in_features_dim == 1:
             pass
+        elif self.config.in_features_dim == 2:
+            stacked_features = np.hstack((stacked_features, features[:, :1]))
         elif self.config.in_features_dim == 4:
             stacked_features = np.hstack((stacked_features, features[:, :3]))
-        elif self.config.in_features_dim == 5:
-            stacked_features = np.hstack((stacked_features, features))
         else:
-            raise ValueError('Only accepted input dimensions are 1, 4 and 5 (without and with XYZ)')
+            raise ValueError('Only accepted input dimensions are 1, 2 and 4')
 
         #######################
         # Create network inputs
@@ -598,16 +606,16 @@ class Vaihingen3DDataset(PointCloudDataset):
         scales = np.array(s_list, dtype=np.float32)
         rots = np.stack(R_list, axis=0)
 
-        # Input features (4 means [ones  intensity absoluteHeight reducedHeight]) double check and clean next lines -jer
+        # Input features (4 means [ones  intensity absoluteHeight reducedHeight])
         stacked_features = np.ones_like(stacked_points[:, :1], dtype=np.float32)
         if self.config.in_features_dim == 1:
             pass
+        elif self.config.in_features_dim == 2:
+            stacked_features = np.hstack((stacked_features, features[:, :1]))
         elif self.config.in_features_dim == 4:
             stacked_features = np.hstack((stacked_features, features[:, :3]))
-        elif self.config.in_features_dim == 5:
-            stacked_features = np.hstack((stacked_features, features))
         else:
-            raise ValueError('Only accepted input dimensions are 1, 4 and 5 (without and with XYZ)')
+            raise ValueError('Only accepted input dimensions are 1, 2 and 4')
 
         #######################
         # Create network inputs
@@ -629,8 +637,7 @@ class Vaihingen3DDataset(PointCloudDataset):
 
     def prepare_Vaihingen3D_ply(self):
         # Preparing files by reducing coordinates and converting to float32
-
-        print('\nPreparing ply files')
+        
         t0 = time.time()
 
         # Folder for the ply files
@@ -645,13 +652,17 @@ class Vaihingen3DDataset(PointCloudDataset):
         data = read_ply(join(self.path, self.cloud_names[0] + '.ply'))
         offset = np.vstack((data['x'][0], data['y'][0], data['z'][0])).T
 
-        # Assign training/validation and test cloud names
-        if self.set == 'test':
+        # Assign validation and test cloud names
+        # Note: Train clouds are skipped here because they are already processed
+        if self.set == 'training':
+            return
+        elif self.set == 'test':
             cloud_names_sort = [self.cloud_names[self.test_split]]
-        else:
-            cloud_names_sort = self.cloud_names[0:self.test_split]
+        elif self.set == 'validation':
+            cloud_names_sort = [self.cloud_names[self.validation_split]]
 
         # Prepare all clouds
+        print('\nPreparing ply files')
         for cloud_name in cloud_names_sort:
 
             # Pass if the cloud has already been computed
@@ -716,18 +727,36 @@ class Vaihingen3DDataset(PointCloudDataset):
             if exists(KDTree_file):
                 print('\nFound KDTree for cloud {:s}, subsampled at {:.3f}'.format(cloud_name, dl))
 
-                # Read ply with data
-                data = read_ply(sub_ply_file)
-                sub_colors = data['intensity'].T
-                sub_labels = data['class']
+                if self.set in ['validation', 'test']:    
 
-                if len(sub_colors.shape) == 1:
-                    sub_colors = np.expand_dims(sub_colors, axis=-1)
+                    # Read ply with data
+                    data = read_ply(sub_ply_file)
+                    sub_colors = data['intensity'].T
+                    sub_labels = data['class']
 
-                # Read pkl with search tree
-                with open(KDTree_file, 'rb') as f:
-                    search_tree = pickle.load(f)
+                    if len(sub_colors.shape) == 1:
+                        sub_colors = np.expand_dims(sub_colors, axis=-1)
 
+                    # Read pkl with search tree
+                    with open(KDTree_file, 'rb') as f:
+                        search_tree = pickle.load(f)
+                else:
+
+                    # Read ply and pseudo labels
+                    data = read_ply(sub_ply_file)
+                    pseudo_labels = join(self.path, 'PseudoLabels', self.config.weak_label_log,
+                                         cloud_name + '_t' + str(self.config.contrast_thd) + '_pseudo.txt')
+                    sub_labels = np.genfromtxt(pseudo_labels).astype('int32')
+                    print(pseudo_labels)   # remove this -jer
+                    sub_colors = data['intensity'].T
+                    
+                    if len(sub_colors.shape) == 1:      # what is this for? Check when debugging -jer
+                        sub_colors = np.expand_dims(sub_colors, axis=-1)
+                    
+                    # Read pkl with search tree
+                    with open(KDTree_file, 'rb') as f:
+                        search_tree = pickle.load(f)
+                        
             else:
                 print('\nPreparing KDTree for cloud {:s}, subsampled at {:.3f}'.format(cloud_name, dl))
 
@@ -767,7 +796,7 @@ class Vaihingen3DDataset(PointCloudDataset):
             self.input_colors += [sub_colors]
             self.input_labels += [sub_labels]
 
-            size = sub_colors.shape[0] * 4 * 7
+            size = sub_colors.shape[0] * 4 * 5
             print('{:.1f} MB loaded in {:.1f}s'.format(size * 1e-6, time.time() - t0))
 
         ############################
@@ -794,6 +823,7 @@ class Vaihingen3DDataset(PointCloudDataset):
 
                 # Check if inputs have already been computed
                 if exists(coarse_KDTree_file):
+
                     # Read pkl with search tree
                     with open(coarse_KDTree_file, 'rb') as f:
                         search_tree = pickle.load(f)
@@ -881,10 +911,10 @@ class Vaihingen3DDataset(PointCloudDataset):
 #       \********************************/
 
 
-class Vaihingen3DSampler(Sampler):
-    """Sampler for Vaihingen3D"""
+class Vaihingen3DPLSampler(Sampler):
+    """Sampler for Vaihingen3DPL"""
 
-    def __init__(self, dataset: Vaihingen3DDataset):
+    def __init__(self, dataset: Vaihingen3DPLDataset):
         Sampler.__init__(self, dataset)
 
         # Dataset used by the sampler (no copy is made in memory)
@@ -1343,8 +1373,8 @@ class Vaihingen3DSampler(Sampler):
         return
 
 
-class Vaihingen3DCustomBatch:
-    """Custom batch definition with memory pinning for Vaihingen3D"""
+class Vaihingen3DPLCustomBatch:
+    """Custom batch definition with memory pinning for Vaihingen3DPL"""
 
     def __init__(self, input_list):
 
@@ -1482,8 +1512,8 @@ class Vaihingen3DCustomBatch:
         return all_p_list
 
 
-def Vaihingen3DCollate(batch_data):
-    return Vaihingen3DCustomBatch(batch_data)
+def Vaihingen3DPLCollate(batch_data):
+    return Vaihingen3DPLCustomBatch(batch_data)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

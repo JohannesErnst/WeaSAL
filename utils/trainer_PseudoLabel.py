@@ -188,10 +188,10 @@ class ModelTrainer:
                 loss = net.loss(outputs, batch.labels)
                 loss_contrast = torch.tensor(0).float().cuda()
                 if self.epoch >= config.contrast_start:
-                    loss_contrast = net.contrast_loss_w(outputs, batch.labels, config)
+                    loss_contrast = net.contrast_loss(outputs, batch.labels, config)
 
                 loss = loss + loss_contrast
-                acc = net.accuracy(outputs, batch.labels)
+                acc = net.accuracy(outputs.data, batch.labels)          # check if "outputs.data" is the right thing -jer (because accuracy() was changed, it was only "outputs" before)
 
                 t += [time.time()]
 
@@ -488,10 +488,6 @@ class ModelTrainer:
                 makedirs(val_path)
             files = val_loader.dataset.files
             Confs = np.zeros((config.num_classes, config.num_classes), dtype=np.int32)
-            if config.dataset in ['rotterdam', 'Dales', 'Vaihingen']:
-                # this needs to be changed since i don't use rotterdam. But do we even get here? Why the +1? -jer
-                exit("Stop here and look into code -jer")
-                Confs = np.zeros((config.num_classes+1, config.num_classes+1), dtype=np.int32)
                 
             for i, file_path in enumerate(files):
 

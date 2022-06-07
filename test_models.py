@@ -28,7 +28,7 @@ import sys
 import torch
 
 # Dataset
-from datasets.Vaihingen3D import *
+from datasets.Vaihingen3D_PseudoLabel import *
 from torch.utils.data import DataLoader
 
 from utils.config import Config
