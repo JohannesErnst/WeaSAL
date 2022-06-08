@@ -747,7 +747,6 @@ class Vaihingen3DPLDataset(PointCloudDataset):
                     pseudo_labels = join(self.path, 'PseudoLabels', self.config.weak_label_log,
                                          cloud_name + '_t' + str(self.config.contrast_thd) + '_pseudo.txt')
                     sub_labels = np.genfromtxt(pseudo_labels).astype('int32')
-                    print(pseudo_labels)   # remove this -jer
                     sub_colors = data['intensity'].T
                     
                     if len(sub_colors.shape) == 1:      # what is this for? Check when debugging -jer

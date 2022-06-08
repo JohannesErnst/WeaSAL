@@ -142,16 +142,16 @@ class Vaihingen3DWLConfig(Config):
     grad_clip_norm = 1
 
     # Number of batch
-    batch_num = 2
+    batch_num = 4
 
     # Number of steps per epochs
-    epoch_steps = 100
+    epoch_steps = 600
 
     # Number of validation examples per epoch
     validation_size = 50
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 1
+    checkpoint_gap = 10
 
     # Augmentations
     augment_scale_anisotropic = True

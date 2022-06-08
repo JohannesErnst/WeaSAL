@@ -406,10 +406,13 @@ class KPFCNN(nn.Module):
             """
             Runs contrastive loss on outputs of the model
             :param outputs: logits predicted by the network
-            :param labels: labels
+            :param labels: ground truth pseudo labels
+            :param threshold: threshold for ignoring uncertain labels
             :return: loss
             """
             # Check this function and append comments when debugging -jer
+            # Its really weird, I especially don't understand the mask part and why we should use 1000 as slc_con -jer
+            # And what even is slc_con?? -jer
             # Define parameter
             temperature = 0.1
             base_temperature = 1
@@ -434,18 +437,18 @@ class KPFCNN(nn.Module):
             pseudo_lbs[label_id] = labels[label_id] 
             all_valid_idx = torch.where(certain_label)[0]
 
-            # Random slc 2000 indx
-            nn = all_valid_idx.shape[0] 
-            if nn < 1:
-                print('skipped')
+            # Collect slc_con random indices
+            num_valid = all_valid_idx.shape[0] 
+            if num_valid < 1:
+                print('Skipped loss calculations because there are no valid points in batch')
                 return tensor_0
-            if nn >= slc_con:
-                slc_idx_idx = torch.randint(0,nn,(slc_con,))
+            if num_valid >= slc_con:
+                slc_idx_idx = torch.randint(0,num_valid,(slc_con,))
                 slc_idx = all_valid_idx[slc_idx_idx]
             else:
-                o_idx = torch.arange(nn)
-                slc_idx_idx =  torch.randint(0,nn,(slc_con-nn,))
-                slc_idx_idx = torch.stack((o_idx, slc_idx_idx), dim = 0)
+                o_idx = torch.arange(num_valid)
+                slc_idx_idx =  torch.randint(0,num_valid,(slc_con-num_valid,))
+                slc_idx_idx = torch.cat((o_idx, slc_idx_idx), dim = 0)
                 slc_idx = all_valid_idx[slc_idx_idx]
 
             # Create a mask
@@ -464,12 +467,10 @@ class KPFCNN(nn.Module):
             mask_certaion = certain_label_slc.unsqueeze(0) == certain_label.unsqueeze(-1) 
             
             pos_mask = pseudo_label_slc.unsqueeze(0) == pseudo_lbs.unsqueeze(-1) * mask1 * mask_certaion
-            outputs = nn.functionals.normalize(outputs, dim=1)    
+            outputs = nn.functional.normalize(outputs, dim=1)    
             x_slc = outputs[slc_idx]
             
-            mul = torch.div(
-                torch.matmul(outputs, x_slc.T),
-                temperature)
+            mul = torch.div(torch.matmul(outputs, x_slc.T), temperature)
             eps = 1e-8
 
             # For numerical stability
@@ -477,14 +478,14 @@ class KPFCNN(nn.Module):
             logits = mul - logits_max.detach()
 
             # Compute logarithmic probability
-            exp_logits = torch.exp(logits) * (mask1 * mask_certaion) # (0,1]
-            log_prob = (logits - torch.log((exp_logits.sum(1, keepdim=True)+eps)))* (mask1 * mask_certaion) 
+            exp_logits = torch.exp(logits) * (mask1 * mask_certaion)
+            log_prob = (logits - torch.log((exp_logits.sum(1, keepdim=True)+eps))) * (mask1 * mask_certaion) 
 
             # Compute mean of log-likelihood over positive samples
             # If no positve samples are found, take them as 0
             mean_log_prob_pos = (pos_mask * log_prob).sum(1) / (pos_mask.sum(1)+1e-12)
             self.pts_loss = - (temperature / base_temperature) * mean_log_prob_pos
-            cal_slc = self.pts_loss>0
+            cal_slc = self.pts_loss > 0
             self.pts_loss = self.pts_loss[cal_slc]
             pseudo_lbs = pseudo_lbs[cal_slc]
             self.pts_loss = scatter(self.pts_loss, pseudo_lbs, reduce="mean")
@@ -725,7 +726,7 @@ class KPFCNN_mprm(nn.Module):
         Runs the overlap region loss on outputs of the model
         :param cam: logits of attention modules (class activation map)
         :param regions_all: indices of subregion points
-        :param regions_lb: weak labels of subregions
+        :param regions_lb: ground truth weak labels of subregions
         :param batch_lengths: batch lengths
         :return: loss
         """        
@@ -742,8 +743,11 @@ class KPFCNN_mprm(nn.Module):
             regions = regions_all[ri]
             end_id = star_id + batch_lengths[ri]
             logits = cam_all[:,star_id:end_id,:]
-            
+
+            # Retrieve ground truth weak labels
             all_cls_lbs.append(np.stack(regions_lb[ri]).astype('float32'))
+
+            # Retrieve weak labels based on output logits (predicted)
             for ii in range(len(regions)):
                 slc_dix = regions[ii].astype('int64') 
                 slc_dix = torch.from_numpy(slc_dix).cuda()
@@ -752,15 +756,14 @@ class KPFCNN_mprm(nn.Module):
 
             star_id = star_id + batch_lengths[ri]
         
+        # Stack weak labels (ground truth and predicted) and calculate loss
         all_cls_lbs = np.vstack(all_cls_lbs)
         all_cls_lbs = torch.from_numpy(all_cls_lbs).cuda()
-        
-        # Stack features and calculate loss
         averaged_features = torch.stack(averaged_features)
         for ii in range(averaged_features.shape[1]):
             self.output_loss = self.output_loss + self.criterion_multi(averaged_features[:,ii,:],all_cls_lbs)
 
-        return self.output_loss 
+        return self.output_loss
 
     def accuracy(self, logits, labels):        
         """ 

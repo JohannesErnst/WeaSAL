@@ -174,7 +174,8 @@ class Vaihingen3DPLConfig(Config):
     contrast_start = 0
     contrast_thd = 20
 
-    # Choose pseudo label log
+    # Choose model name and pseudo label log
+    model_name = 'KPFCNN'
     weak_label_log = 'Log_2022-06-04_15-35-23'
 
     # Choose weights for class

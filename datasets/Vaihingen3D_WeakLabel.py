@@ -449,14 +449,17 @@ class Vaihingen3DWLDataset(PointCloudDataset):
                 region_lb_list += [region_lb]
 
             # Update batch size and stop when batch is full
-            if self.set == 'training':
-                batch_n += 1
-                if batch_n > 1: # hier was mit batch_num -jer
-                    break
-            else:
-                batch_n += n
-                if batch_n > int(self.batch_limit):
-                    break
+            # if self.set == 'training':
+            #     batch_n += 1
+            #     if batch_n > 1: # hier was mit batch_num -jer
+            #         break
+            # else:
+            #     batch_n += n
+            #     if batch_n > int(self.batch_limit):
+            #         break
+            batch_n += n
+            if batch_n > int(self.batch_limit):
+                break
 
         ###################
         # Concatenate batch

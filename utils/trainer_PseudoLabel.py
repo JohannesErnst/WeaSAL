@@ -191,7 +191,7 @@ class ModelTrainer:
                     loss_contrast = net.contrast_loss(outputs, batch.labels, config)
 
                 loss = loss + loss_contrast
-                acc = net.accuracy(outputs.data, batch.labels)          # check if "outputs.data" is the right thing -jer (because accuracy() was changed, it was only "outputs" before)
+                acc = net.accuracy(outputs, batch.labels)
 
                 t += [time.time()]
 
@@ -306,9 +306,7 @@ class ModelTrainer:
         softmax = torch.nn.Softmax(1)
 
         # Do not validate if dataset has no validation cloud
-        # should this be like in lin et al: "if val_loader.dataset.validation_split[0] not in val_loader.dataset.all_splits:"? -jer
         if val_loader.dataset.validation_split not in val_loader.dataset.all_splits:
-            exit("Check comment above -jer")
             return
 
         # Number of classes including ignored labels

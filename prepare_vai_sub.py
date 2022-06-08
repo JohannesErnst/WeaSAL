@@ -26,6 +26,7 @@ from os.path import exists, join
 from utils.anchors import *
 
 # Maybe this file should be included in train or test at some point or combined with vai_pseudo.py -jer
+# Mayve we can also read in the config file like done in test_models.py -jer
 
 # ----------------------------------------------------------------------------------------------------------------------
 #
