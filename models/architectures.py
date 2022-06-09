@@ -691,14 +691,9 @@ class KPFCNN_mprm(nn.Module):
         return x, cla_logits, cam
    
     def class_logits_loss(self, class_logits, cloud_lb):
-        # I think this loss can be deleted at some point because it was used by Wei et al
-        # and doesn't consider the overlap region loss. If I delete this, I may completely remove
-        # the variables cloud_lb and cloud_all_lb from Vaihingen3D_WeakLabel because they are only
-        # weak labels used for the whole input sphere (in_radius) and not the smaller subclouds 
-        # (i.e. subradius). Then only the variables region_lb and region will be left. This should
-        # be a little less confusing in Vaihingen3d_WeakLabel.py. -jer
         """
-        Runs the BCEWithLogitsLoss (binary cross entropy) on outputs of the model
+        Runs the BCEWithLogitsLoss (binary cross entropy) on outputs of the model.
+        Uses one weak labels per input sphere (and not per subclouds).
         :param class_logits: logits
         :param cloud_lb: labels
         :return: loss
@@ -723,7 +718,8 @@ class KPFCNN_mprm(nn.Module):
 
     def region_mprm_loss(self, cam, regions_all, regions_lb, batch_lengths):
         """
-        Runs the overlap region loss on outputs of the model
+        Runs the overlap region loss on outputs of the model.
+        Uses weak labels per subcloud (so multiple weak labels in one input sphere).
         :param cam: logits of attention modules (class activation map)
         :param regions_all: indices of subregion points
         :param regions_lb: ground truth weak labels of subregions

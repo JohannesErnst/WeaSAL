@@ -26,7 +26,7 @@ import glob
 
 # Configure folder, model and checkpoint
 base_folder = 'test/'
-weak_label_log = 'Log_2022-06-04_15-35-23'
+weak_label_log = 'Log_2022-06-08_15-01-36'
 data_folder = 'data/Vaihingen3D'
 subsampling = 'input_0.240'
 sub_folder = join(data_folder,subsampling)
@@ -93,5 +93,5 @@ for file in file_list:
     weights_path = join(out_folder, file_name+'_t'+str(threshold)+'_weight.txt')
     np.savetxt(weights_path, weights_norm, fmt='%.3f')
 
-    print('Created: ' + pseudo_path)
-    print('Created: ' + weights_path)
+    print('\nCreated: ' + pseudo_path)
+    print('Created: ' + weights_path + '\n')

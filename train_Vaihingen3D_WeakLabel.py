@@ -142,7 +142,7 @@ class Vaihingen3DWLConfig(Config):
     grad_clip_norm = 1
 
     # Number of batch
-    batch_num = 4
+    batch_num = 3
 
     # Number of steps per epochs
     epoch_steps = 600

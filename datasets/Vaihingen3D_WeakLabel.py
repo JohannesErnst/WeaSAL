@@ -448,15 +448,6 @@ class Vaihingen3DWLDataset(PointCloudDataset):
                 region_list += [region_idx]
                 region_lb_list += [region_lb]
 
-            # Update batch size and stop when batch is full
-            # if self.set == 'training':
-            #     batch_n += 1
-            #     if batch_n > 1: # hier was mit batch_num -jer
-            #         break
-            # else:
-            #     batch_n += n
-            #     if batch_n > int(self.batch_limit):
-            #         break
             batch_n += n
             if batch_n > int(self.batch_limit):
                 break
@@ -1168,7 +1159,7 @@ class Vaihingen3DWLSampler(Sampler):
                         smooth_errors = smooth_errors[1:]
 
                     # Update batch limit with P controller
-                    self.dataset.batch_limit += Kp * error + Ki * error_I + Kd * error_D        # this formula is different in Lin et al -jer
+                    self.dataset.batch_limit += Kp * error + Ki * error_I + Kd * error_D
 
                     # Unstability detection
                     if not stabilized and self.dataset.batch_limit < 0:

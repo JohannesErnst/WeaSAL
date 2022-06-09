@@ -372,9 +372,8 @@ class ModelTester:
                                   ['x', 'y', 'z', 'pots'])
 
                         # Save ascii preds
-                        if test_loader.dataset.set == 'test':
-                            ascii_name = join(test_path, 'predictions', cloud_name[:-4] + '.txt')
-                            np.savetxt(ascii_name, preds, fmt='%d')
+                        # ascii_name = join(test_path, 'predictions', cloud_name[:-4] + '.txt')
+                        # np.savetxt(ascii_name, preds, fmt='%d')
 
                     t2 = time.time()
                     print('Done in {:.1f} s\n'.format(t2 - t1))

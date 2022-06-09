@@ -176,7 +176,7 @@ class Vaihingen3DPLConfig(Config):
 
     # Choose model name and pseudo label log
     model_name = 'KPFCNN'
-    weak_label_log = 'Log_2022-06-04_15-35-23'
+    weak_label_log = 'Log_2022-06-08_15-01-36'
 
     # Choose weights for class
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]
