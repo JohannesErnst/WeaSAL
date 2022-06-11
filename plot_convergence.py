@@ -37,6 +37,7 @@ from utils.ply import read_ply
 
 # Datasets
 from datasets.Vaihingen3D_WeakLabel import Vaihingen3DWLDataset
+from datasets.Vaihingen3D_PseudoLabel import Vaihingen3DPLDataset
 
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -734,8 +735,8 @@ def experiment_name_1():
     """
 
     # Using the dates of the logs, you can easily gather consecutive ones. All logs should be of the same dataset.
-    start = 'Log_2022-06-08_15-01-36'
-    end = 'Log_2022-06-08_15-01-36'
+    start = 'Log_2022-06-10_20-39-21'
+    end = 'Log_2022-06-10_20-39-21'
 
     # Name of the result path
     res_path = 'results'
@@ -744,7 +745,7 @@ def experiment_name_1():
     logs = np.sort([join(res_path, l) for l in listdir_str(res_path) if start <= l <= end])
 
     # Give names to the logs (for plot legends)
-    logs_names = ['V3D weak label',
+    logs_names = ['V3D pseudo label',
                   '']
 
     # safe check log names
@@ -831,9 +832,14 @@ if __name__ == '__main__':
     if config.dataset_task == 'classification':
         compare_convergences_classif(logs, logs_names)
     elif config.dataset_task == 'cloud_segmentation':
-        if config.dataset.startswith('Vaihingen3D'):
+        if config.dataset.startswith('Vaihingen3DWL'):
             dataset = Vaihingen3DWLDataset(config, load_data=False)
             compare_convergences_segment(dataset, logs, logs_names) 
+        elif config.dataset.startswith('Vaihingen3DPL'):          # chekc if this works with PL and WL -jer
+            dataset = Vaihingen3DPLDataset(config, load_data=False)
+            compare_convergences_segment(dataset, logs, logs_names) 
+        else:
+            raise ValueError('Unsupported dataset : ' + plot_dataset)
         # elif config.dataset.startswith('DALES'):
         #     dataset = DALESDataset(config, load_data=False)
         #     compare_convergences_segment(dataset, logs, logs_names)

@@ -7,7 +7,7 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Class handling the test with weak region labels
+#      Class handling the test with point (or pseudo) labels
 #      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
@@ -48,7 +48,7 @@ import pickle
 #
 
 
-class ModelTesterWL:
+class ModelTesterPL:
 
     # Initialization methods
     # ------------------------------------------------------------------------------------------------------------------
@@ -119,7 +119,7 @@ class ModelTesterWL:
             test_path = None
 
         # If on validation directly compute score
-        if test_loader.dataset.set == 'validation':
+        if test_loader.dataset.set in ['test', 'validation']:
             val_proportions = np.zeros(nc_model, dtype=np.float32)
             i = 0
             for label_value in test_loader.dataset.label_values:
@@ -157,12 +157,12 @@ class ModelTesterWL:
                     batch.to(self.device)
 
                 # Forward pass
-                self.logits, self.class_logits, self.cam = net(batch, config)
+                outputs = net(batch, config)
 
                 t += [time.time()]
 
                 # Get probs and labels
-                stacked_probs = softmax(self.logits).cpu().detach().numpy()
+                stacked_probs = softmax(outputs).cpu().detach().numpy()
                 s_points = batch.points[0].cpu().numpy()
                 lengths = batch.lengths[0].cpu().numpy()
                 in_inds = batch.input_inds.cpu().numpy()
@@ -219,7 +219,7 @@ class ModelTesterWL:
                 last_min += 1
 
                 # Show vote results (On subcloud so it is not the good values here)
-                if test_loader.dataset.set == 'validation':
+                if test_loader.dataset.set in ['test', 'validation']:
                     print('\nConfusion on sub clouds')
                     Confs = []
                     for i, file_path in enumerate(test_loader.dataset.files):
@@ -260,9 +260,6 @@ class ModelTesterWL:
                     print(s + '\n')
 
                 # Save real IoU when reaching number of desired votes
-                all_pseudo_lbs = dict()
-                all_pseduo_probs = dict()
-
                 if last_min > num_votes:
 
                     # Project predictions
@@ -275,27 +272,11 @@ class ModelTesterWL:
                         probs = self.test_probs[i][test_loader.dataset.test_proj[i], :]
                         proj_probs += [probs]
 
-                        # Get pseudo labels
-                        fn = file_path.split('/')[-1].split('.txt')[0]
-                        unlabel_pts = self.test_probs[i][:, 0] == 0
-                        all_pseduo_probs[fn] = self.test_probs[i]
-                        pseudo_lbs = np.argmax(self.test_probs[i], axis=1) + 1
-                        pseudo_lbs[unlabel_pts] = 0
-                        all_pseudo_lbs[fn] = pseudo_lbs
-
-                    # Save pseudo labels
-                    pl_path = join(test_path, '_pseudo.pickle')
-                    prob_path = join(test_path, '_probs.pickle')
-                    with open(pl_path, 'wb') as fff:
-                        pickle.dump(all_pseudo_lbs, fff)
-                    with open(prob_path, 'wb') as fff:
-                        pickle.dump(all_pseduo_probs, fff)
-
                     t2 = time.time()
                     print('Done in {:.1f} s\n'.format(t2 - t1))
 
                     # Show vote results
-                    if test_loader.dataset.set == 'validation':
+                    if test_loader.dataset.set in ['test', 'validation']:
                         print('Confusion on full clouds')
                         t1 = time.time()
                         Confs = []
@@ -345,17 +326,12 @@ class ModelTesterWL:
                         # Get the predicted labels
                         preds = test_loader.dataset.label_values[np.argmax(proj_probs[i], axis=1)].astype(np.int32)
 
-                        # Create error map
-                        targets = test_loader.dataset.validation_labels[i]
-                        error_map = preds != targets
-                        error_map = error_map.astype('int8')
-
                         # Save plys
                         cloud_name = file_path.split('/')[-1]
                         test_name = join(test_path, 'predictions', cloud_name)
                         write_ply(test_name,
-                                  [points, preds, targets, error_map],
-                                  ['x', 'y', 'z', 'preds', 'targets', 'error'])
+                                  [points, preds],
+                                  ['x', 'y', 'z', 'preds'])
                         test_name2 = join(test_path, 'probs', cloud_name)
                         prob_names = ['_'.join(test_loader.dataset.label_to_names[label].split())
                                       for label in test_loader.dataset.label_values]

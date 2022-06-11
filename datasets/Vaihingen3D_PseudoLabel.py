@@ -749,7 +749,8 @@ class Vaihingen3DPLDataset(PointCloudDataset):
                     sub_labels = np.genfromtxt(pseudo_labels).astype('int32')
                     sub_colors = data['intensity'].T
                     
-                    if len(sub_colors.shape) == 1:      # what is this for? Check when debugging -jer
+                    # Make sure sub_colors has the right dimension
+                    if len(sub_colors.shape) == 1:
                         sub_colors = np.expand_dims(sub_colors, axis=-1)
                     
                     # Read pkl with search tree

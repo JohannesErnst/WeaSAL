@@ -50,7 +50,7 @@ class Vaihingen3DPLConfig(Config):
     ####################
 
     # Dataset name
-    dataset = 'Vaihingen3D'
+    dataset = 'Vaihingen3DPL'
 
     # Number of classes in the dataset (This value is overwritten by dataset class when Initializating dataset).
     num_classes = None

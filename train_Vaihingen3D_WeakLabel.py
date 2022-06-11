@@ -52,7 +52,7 @@ class Vaihingen3DWLConfig(Config):
     ####################
 
     # Dataset name
-    dataset = 'Vaihingen3D'
+    dataset = 'Vaihingen3DWL'
 
     # Number of classes in the dataset (This value is overwritten by dataset class when Initializating dataset).
     num_classes = None
@@ -141,7 +141,7 @@ class Vaihingen3DWLConfig(Config):
     lr_decays = {i: 0.98 for i in range(1, 1000)}
     grad_clip_norm = 1
 
-    # Number of batch
+    # Number of batch (or number of input spheres)
     batch_num = 3
 
     # Number of steps per epochs

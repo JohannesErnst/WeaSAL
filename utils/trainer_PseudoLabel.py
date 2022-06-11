@@ -485,7 +485,7 @@ class ModelTrainer:
             if not exists(val_path):
                 makedirs(val_path)
             files = val_loader.dataset.files
-            Confs = np.zeros((config.num_classes, config.num_classes), dtype=np.int32)
+            Confs = np.zeros((config.num_classes+1, config.num_classes+1), dtype=np.int32)
                 
             for i, file_path in enumerate(files):
 

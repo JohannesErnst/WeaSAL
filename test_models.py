@@ -7,7 +7,7 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Callable script to test networks on variable datasets
+#      Callable script to test any model on variable datasets
 #      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
@@ -28,12 +28,14 @@ import sys
 import torch
 
 # Dataset
+from datasets.Vaihingen3D_WeakLabel import *
 from datasets.Vaihingen3D_PseudoLabel import *
 from torch.utils.data import DataLoader
 
 from utils.config import Config
-from utils.tester_WeakLabel import ModelTester
-from models.architectures import KPCNN, KPFCNN
+from utils.tester_WeakLabel import ModelTesterWL
+from utils.tester_PseudoLabel import ModelTesterPL
+from models.architectures import *
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -42,7 +44,7 @@ from models.architectures import KPCNN, KPFCNN
 #       \***************/
 #
 
-def model_choice(chosen_log):
+def model_choice(chosen_log):   # clear this function / update at some point? -jer
 
     ###########################
     # Call the test initializer
@@ -92,7 +94,7 @@ if __name__ == '__main__':
     #       > 'last_XXX': Automatically retrieve the last trained model on dataset XXX
     #       > '(old_)results/Log_YYYY-MM-DD_HH-MM-SS': Directly provide the path of a trained model
 
-    chosen_log = 'results/Log_2022-05-05_14-21-26'
+    chosen_log = 'results/Log_2022-06-10_20-39-21'
 
     # Choose the index of the checkpoint to load OR None if you want to load the current checkpoint
     chkp_idx = -1
@@ -144,6 +146,7 @@ if __name__ == '__main__':
     #config.in_radius = 4
     config.validation_size = 200
     config.input_threads = 10
+    config.dropout = 0
 
     ##############
     # Prepare Data
@@ -159,10 +162,14 @@ if __name__ == '__main__':
         set = 'test'
 
     # Initiate dataset
-    if config.dataset == 'Vaihingen3D':
-        test_dataset = Vaihingen3DDataset(config, set=set, use_potentials=True)
-        test_sampler = Vaihingen3DSampler(test_dataset)
-        collate_fn = Vaihingen3DCollate
+    if config.dataset == 'Vaihingen3DWL':
+        test_dataset = Vaihingen3DWLDataset(config, set=set, use_potentials=True)
+        test_sampler = Vaihingen3DWLSampler(test_dataset)
+        collate_fn = Vaihingen3DWLCollate
+    elif config.dataset == 'Vaihingen3D':       # change to Vaihingen3DPL -jer
+        test_dataset = Vaihingen3DPLDataset(config, set=set, use_potentials=True)
+        test_sampler = Vaihingen3DPLSampler(test_dataset)
+        collate_fn = Vaihingen3DPLCollate
     elif config.dataset == 'DALES':
         print("Not implemented")
         # test_dataset = DALESDataset(config, set=set, use_potentials=True)
@@ -185,28 +192,27 @@ if __name__ == '__main__':
     print('\nModel Preparation')
     print('*****************')
 
-    # Define network model
+    # Define network model and tester (must match training network model)
     t1 = time.time()
-    if config.dataset_task == 'classification':
-        net = KPCNN(config)
-    elif config.dataset_task in ['cloud_segmentation', 'slam_segmentation']:
-        net = KPFCNN(config, test_dataset.label_values, test_dataset.ignored_labels)
+    if config.model_name == 'KPFCNN_mprm':
+        net = KPFCNN_mprm(config, test_dataset.label_values, test_dataset.ignored_labels)
+        tester = ModelTesterWL(net, chkp_path=chosen_chkp)
+    elif config.model_name == 'KPFCNN_mprm_ele':
+        net = KPFCNN_mprm_ele(config, test_dataset.label_values, test_dataset.ignored_labels)
+        tester = ModelTesterWL(net, chkp_path=chosen_chkp) 
+    elif config.model_name == 'KPFCNN':
+        net = KPFCNN(config, test_dataset.label_values, test_dataset.ignored_labels) 
+        tester = ModelTesterPL(net, chkp_path=chosen_chkp)
     else:
-        raise ValueError('Unsupported dataset_task for testing: ' + config.dataset_task)
+        raise ValueError('Unsupported model for testing: ' + config.model_name)
 
-    # Define a visualizer class
-    tester = ModelTester(net, chkp_path=chosen_chkp)
     print('Done in {:.1f}s\n'.format(time.time() - t1))
 
     print('\nStart test')
     print('**********\n')
 
-    # Training
-    if config.dataset_task == 'classification':
-        tester.classification_test(net, test_loader, config)
-    elif config.dataset_task == 'cloud_segmentation':
-        tester.cloud_segmentation_test(net, test_loader, config, num_votes=0)
-    elif config.dataset_task == 'slam_segmentation':
-        tester.slam_segmentation_test(net, test_loader, config)
+    # Testing
+    if config.dataset_task == 'cloud_segmentation':
+        tester.cloud_segmentation_test(net, test_loader, config, num_votes=10)
     else:
         raise ValueError('Unsupported dataset_task for testing: ' + config.dataset_task)
