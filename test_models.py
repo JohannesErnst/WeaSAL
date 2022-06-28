@@ -44,7 +44,7 @@ from models.architectures import *
 #       \***************/
 #
 
-def model_choice(chosen_log):   # clear this function / update at some point? -jer
+def model_choice(chosen_log):   # clear this function / update at some point? Make it run with /WeakLabel/ -jer
 
     ###########################
     # Call the test initializer
@@ -92,15 +92,15 @@ if __name__ == '__main__':
     #   Here you can choose which model you want to test with the variable test_model. Here are the possible values :
     #
     #       > 'last_XXX': Automatically retrieve the last trained model on dataset XXX
-    #       > '(old_)results/Log_YYYY-MM-DD_HH-MM-SS': Directly provide the path of a trained model
+    #       > 'results/XLabel/Log_YYYY-MM-DD_HH-MM-SS': Directly provide the path of a trained model
 
-    chosen_log = 'results/Log_2022-06-10_20-39-21'
+    chosen_log = 'results/WeakLabel/Log_2022-06-28_08-27-45'
 
     # Choose the index of the checkpoint to load OR None if you want to load the current checkpoint
     chkp_idx = -1
 
     # Choose to test on validation or test split
-    on_val = False
+    on_val = True
 
     # Deal with 'last_XXXXXX' choices
     chosen_log = model_choice(chosen_log)
@@ -166,7 +166,7 @@ if __name__ == '__main__':
         test_dataset = Vaihingen3DWLDataset(config, set=set, use_potentials=True)
         test_sampler = Vaihingen3DWLSampler(test_dataset)
         collate_fn = Vaihingen3DWLCollate
-    elif config.dataset == 'Vaihingen3D':       # change to Vaihingen3DPL -jer
+    elif config.dataset == 'Vaihingen3DPL':
         test_dataset = Vaihingen3DPLDataset(config, set=set, use_potentials=True)
         test_sampler = Vaihingen3DPLSampler(test_dataset)
         collate_fn = Vaihingen3DPLCollate

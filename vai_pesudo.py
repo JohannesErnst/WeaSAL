@@ -26,7 +26,7 @@ import glob
 
 # Configure folder, model and checkpoint
 base_folder = 'test/'
-weak_label_log = 'Log_2022-06-08_15-01-36'
+weak_label_log = 'Log_2022-06-28_08-27-45'
 data_folder = 'data/Vaihingen3D'
 subsampling = 'input_0.240'
 sub_folder = join(data_folder,subsampling)
@@ -35,7 +35,7 @@ sub_folder = join(data_folder,subsampling)
 threshold = 20
     
 # Loop over files in prediction folder
-base_path = join(base_folder, weak_label_log)
+base_path = join(base_folder, 'WeakLabel', weak_label_log)
 file_list = glob.glob(base_path+'/predictions/*.ply')
 for file in file_list:
 
