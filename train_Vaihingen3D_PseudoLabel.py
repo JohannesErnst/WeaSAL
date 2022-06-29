@@ -176,12 +176,12 @@ class Vaihingen3DPLConfig(Config):
 
     # Choose model name and pseudo label log
     model_name = 'KPFCNN'
-    weak_label_log = 'Log_2022-06-28_08-27-45'
+    weak_label_log = 'Log_2022-06-08_15-01-36'
 
     # Choose weights for class
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]
-    weight_file = join('data', dataset, 'PseudoLabels', weak_label_log,
-                       'Vaihingen3D_Training_t' + str(contrast_thd) + '_weight.txt')
+    weight_file = join('data', dataset[:-2], 'PseudoLabels', weak_label_log,
+                       dataset[:-2] + '_t' + str(contrast_thd) + '_weight.txt')
     if exists(weight_file):
         class_w = np.genfromtxt(weight_file, delimiter=' ')
 

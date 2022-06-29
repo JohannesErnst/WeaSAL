@@ -273,6 +273,12 @@ class Config:
                 elif line_info[0] == 'loss_type':
                     setattr(self, line_info[0], line_info[2])
 
+                elif line_info[0] == 'sub_radius':
+                    setattr(self, line_info[0], float(line_info[2]))
+                
+                elif line_info[0] == 'anchor_method':
+                    setattr(self, line_info[0], line_info[2])
+
                 elif hasattr(self, line_info[0]):
                     if len(line_info[2].split('.')) == 2:
                         attr_type = type(getattr(self, 'first_subsampling_dl')) # set as float
