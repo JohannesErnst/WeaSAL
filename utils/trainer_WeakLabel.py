@@ -80,7 +80,6 @@ class ModelTrainer:
         deform_params = [v for k, v in net.named_parameters() if 'offset' in k]
         other_params = [v for k, v in net.named_parameters() if 'offset' not in k]
         deform_lr = config.learning_rate * config.deform_lr_factor
-        # here, Lin et al implemented adam algorithm as an optimizer but I think this is not needed (If confused just delete this comment) -jer
         self.optimizer = torch.optim.SGD([{'params': other_params},
                                           {'params': deform_params, 'lr': deform_lr}],
                                          lr=config.learning_rate,
@@ -518,8 +517,9 @@ class ModelTrainer:
             # Save confusions
             c_path = join(val_path, 'conf.txt')
             np.savetxt(c_path, Confs, delimiter=' ', fmt='%i')
-            conf_matrix.plot(Confs, val_loader.dataset.label_to_names, val_path, 
-                             file_suffix=val_loader.dataset.cloud_names[0],
+            cm_name = val_loader.dataset.name + '_' + val_loader.dataset.set
+            conf_matrix.plot(Confs, val_loader.dataset.label_to_names, 
+                             val_path, file_suffix=cm_name,
                              abs_vals=False, F1=True, iou=True, show=False)
 
             # Remove ignored labels from confusions

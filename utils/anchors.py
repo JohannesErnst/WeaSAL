@@ -38,6 +38,7 @@ def get_anchors(points, sub_radius, xyz_offset=[0,0,0], method='full'):
 
     # Find regularly spaced anchor positions 
     if method == 'full':
+        # This method uses anchors with a spacing of sub_radius
         x_step = np.floor((x_max - x_min) / sub_radius) + 1
         y_step = np.floor((y_max - y_min) / sub_radius) + 1
         z_step = np.floor((z_max - z_min) / sub_radius) + 1  
@@ -49,10 +50,8 @@ def get_anchors(points, sub_radius, xyz_offset=[0,0,0], method='full'):
                 for z in z_num:
                     n_anchors.append([x, y, z])
 
-    # what exactly is the difference between reduce1 and full? Look at image created in blender. 
-    # generally you want to find a good compromise between number of weak labels and performance.
-    # reduce1 just uses lesse weak labels. Might experiment with this and rename at some point -jer
-    elif method == 'reduce1':          
+    elif method == 'reduced':
+        # This method uses half of the anchors used in 'full'
         x_step = np.floor((x_max - x_min) / (2*sub_radius)) + 1
         y_step = np.floor((y_max - y_min) / (2*sub_radius)) + 1
         z_step = np.floor((z_max - z_min) / (2*sub_radius)) + 1  

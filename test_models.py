@@ -44,20 +44,25 @@ from models.architectures import *
 #       \***************/
 #
 
-def model_choice(chosen_log):   # clear this function / update at some point? Make it run with /WeakLabel/ -jer
+def model_choice(chosen_log):   # Make it run with /WeakLabel/ check if it works -jer
 
     ###########################
     # Call the test initializer
     ###########################
 
     # Automatically retrieve the last trained model
-    if chosen_log in ['last_ModelNet40', 'last_ShapeNetPart', 'last_S3DIS']:
+    if chosen_log in ['last_Vaihingen3DWL', 'last_Vaihingen3DPL', 'last_DALESWL', 'last_DALESPL']:
 
         # Dataset name
         test_dataset = '_'.join(chosen_log.split('_')[1:])
 
-        # List all training logs
-        logs = np.sort([os.path.join('results', f) for f in os.listdir('results') if f.startswith('Log')])
+        # List all training logs of either weak or pseudo label training
+        if test_dataset[-2:] == 'WL':
+            logs = np.sort([os.path.join('results/WeakLabel', f) 
+                            for f in os.listdir('results') if f.startswith('Log')])
+        else:
+            logs = np.sort([os.path.join('results/PseudoLabel', f) 
+                            for f in os.listdir('results') if f.startswith('Log')])
 
         # Find the last log of asked dataset
         for log in logs[::-1]:
@@ -67,7 +72,7 @@ def model_choice(chosen_log):   # clear this function / update at some point? Ma
                 chosen_log = log
                 break
 
-        if chosen_log in ['last_ModelNet40', 'last_ShapeNetPart', 'last_S3DIS']:
+        if chosen_log in ['last_Vaihingen3DWL', 'last_Vaihingen3DPL', 'last_DALESWL', 'last_DALESPL']:
             raise ValueError('No log of the dataset "' + test_dataset + '" found')
 
     # Check if log exists
@@ -95,6 +100,7 @@ if __name__ == '__main__':
     #       > 'results/XLabel/Log_YYYY-MM-DD_HH-MM-SS': Directly provide the path of a trained model
 
     chosen_log = 'results/WeakLabel/Log_2022-06-28_08-27-45'
+    chosen_log = 'last_Vaihingen3DWL'
 
     # Choose the index of the checkpoint to load OR None if you want to load the current checkpoint
     chkp_idx = -1

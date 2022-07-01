@@ -34,6 +34,9 @@ from sklearn.neighbors import KDTree
 # PLY reader
 from utils.ply import read_ply, write_ply
 
+# Confusion matrix function
+import utils.conf_matrix as conf_matrix
+
 # Metrics
 from utils.metrics import IoU_from_confusions, fast_confusion
 from sklearn.metrics import confusion_matrix
@@ -337,6 +340,7 @@ class ModelTesterWL:
                     # Save predictions
                     print('Saving clouds')
                     t1 = time.time()
+                    Confs = np.zeros((config.num_classes, config.num_classes), dtype=np.int32)
                     for i, file_path in enumerate(test_loader.dataset.files):
 
                         # Get file
@@ -371,9 +375,21 @@ class ModelTesterWL:
                                   [pot_points.astype(np.float32), pots],
                                   ['x', 'y', 'z', 'pots'])
 
+                        # Add up confusions for final confusion matrix
+                        labels = test_loader.dataset.validation_labels[i].astype(np.int32)
+                        Confs += fast_confusion(labels, preds, test_loader.dataset.label_values).astype(np.int32)
+                        # If there is an error here it is due to the size of Confs. In lin et al they use one size bigger for DALES. Not sure why though -jer
+
                         # Save ascii preds
                         # ascii_name = join(test_path, 'predictions', cloud_name[:-4] + '.txt')
                         # np.savetxt(ascii_name, preds, fmt='%d')
+
+                    # Save confusion matrix
+                    cm_path = join(test_path, 'predictions')
+                    cm_name = test_loader.dataset.name + '_' + test_loader.dataset.set
+                    conf_matrix.plot(Confs, test_loader.dataset.label_to_names, 
+                                     cm_path, file_suffix=cm_name,
+                                     abs_vals=False, F1=True, iou=True, show=False)
 
                     t2 = time.time()
                     print('Done in {:.1f} s\n'.format(t2 - t1))

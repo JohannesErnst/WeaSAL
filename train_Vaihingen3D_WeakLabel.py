@@ -171,7 +171,7 @@ class Vaihingen3DWLConfig(Config):
     model_name = 'KPFCNN_mprm_ele'
     loss_type = 'region_mprm_loss'
     xyz_offset = [0, 0, 0]
-    anchor_method = 'reduce1'
+    anchor_method = 'reduced'
 
     # Do we nee to save convergence
     saving = True

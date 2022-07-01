@@ -740,6 +740,7 @@ def experiment_name_1():
 
     # Name of the result path (either WeakLabel or PseudoLabel)
     res_path = 'results/WeakLabel'
+    res_path = 'results/PseudoLabel'
 
     # Gather logs and sort by date
     logs = np.sort([join(res_path, l) for l in listdir_str(res_path) if start <= l <= end])
@@ -768,6 +769,7 @@ def experiment_name_2():
 
     # Name of the result path (either WeakLabel or PseudoLabel)
     res_path = 'results/WeakLabel'
+    res_path = 'results/PseudoLabel'
 
     # Gather logs and sort by date
     logs = np.sort([join(res_path, l) for l in listdir_str(res_path) if start <= l <= end])

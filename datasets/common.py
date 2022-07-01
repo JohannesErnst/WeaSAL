@@ -571,16 +571,3 @@ class PointCloudDataset(Dataset):
         li += [stacked_features, labels]
 
         return li
-
-
-
-
-
-
-
-
-
-
-
-
-

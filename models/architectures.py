@@ -404,22 +404,24 @@ class KPFCNN(nn.Module):
 
     def contrast_loss(self, outputs, labels, config, threshold=0.2):
             """
-            Runs contrastive loss on outputs of the model
+            Runs contrastive loss on outputs of the model by selecting a number of
+            points (here slc_con) to compare with each input point and determining
+            whether they are negative (of different classes) or positive samples 
+            (of the same class). With this metric the contrastive loss is calculated.
             :param outputs: logits predicted by the network
             :param labels: ground truth pseudo labels
             :param threshold: threshold for ignoring uncertain labels
             :return: loss
             """
-            # Check this function and append comments when debugging -jer
-            # Its really weird, I especially don't understand the mask part and why we should use 1000 as slc_con -jer
-            # And what even is slc_con?? -jer
-            # Define parameter
+
+            # Define parameters
             temperature = 0.1
             base_temperature = 1
             self.pts_loss = 0
             self.pts_loss_self = 0
-            slc_con = 1000          # what is this parameter? -jer
-            N = outputs.shape[0]        
+            slc_con = 1000
+            N = outputs.shape[0]
+            eps = 1e-8
             tensor_0 = torch.tensor(0).float().cuda()
             threshold = config.contrast_thd / 100
             
@@ -432,12 +434,12 @@ class KPFCNN(nn.Module):
             certain_label = pseudo_logits > threshold
             certain_label = (certain_label + label_id) > 0
 
-            # Get pseudo labels
+            # Get the valid pseudo labels
             pseudo_lbs = torch.argmax(prob, dim=1)
             pseudo_lbs[label_id] = labels[label_id] 
             all_valid_idx = torch.where(certain_label)[0]
 
-            # Collect slc_con random indices
+            # Collect slc_con random indices from the valid pseudo labels (--> slice)
             num_valid = all_valid_idx.shape[0] 
             if num_valid < 1:
                 print('Skipped loss calculations because there are no valid points in batch')
@@ -451,37 +453,44 @@ class KPFCNN(nn.Module):
                 slc_idx_idx = torch.cat((o_idx, slc_idx_idx), dim = 0)
                 slc_idx = all_valid_idx[slc_idx_idx]
 
-            # Create a mask
-            mask1 = torch.ones(N, slc_con)
+            # Create a mask [N x slc_con] that marks all slice indices per input point
+            mask_slice = torch.ones(N, slc_con)
             all_idx = torch.arange(N).cuda()
             idx = torch.where(all_idx[:, None] == slc_idx[None, :])
             cc = torch.stack(idx, dim=0).T
             cc = cc.cuda()
-            mask1[cc[:,0], cc[:,1]] = 0
-            mask1 = mask1.cuda()
+            mask_slice[cc[:,0], cc[:,1]] = 0
+            mask_slice = mask_slice.cuda()
                     
+            # Collect pseudo labels and points of the slice
             pseudo_label_slc = pseudo_lbs[slc_idx]
+            certain_label_slc = certain_label[slc_idx]
             
-            certain_label_slc = certain_label[slc_idx] 
+            # Create a mask [N x slc_con] that marks all certain label indices per input point
+            mask_certain = certain_label_slc.unsqueeze(0) == certain_label.unsqueeze(-1) 
             
-            mask_certaion = certain_label_slc.unsqueeze(0) == certain_label.unsqueeze(-1) 
-            
-            pos_mask = pseudo_label_slc.unsqueeze(0) == pseudo_lbs.unsqueeze(-1) * mask1 * mask_certaion
-            outputs = nn.functional.normalize(outputs, dim=1)    
+            # Create a mask [N x slc_con] that marks where the slice point labels are equal 
+            # to the input point labels (i.e. the so called positive samples in paper)
+            mask_positive = pseudo_label_slc.unsqueeze(0) == pseudo_lbs.unsqueeze(-1)
+
+            # Concatenate masks to get the positions of the points used for calculating 
+            # the supervised contrastive loss per input point
+            pos_mask = mask_positive * mask_slice * mask_certain
+
+            # Select normalized slice-logits as [N x slc_con] and weight with temperature
+            outputs = nn.functional.normalize(outputs, dim=1)
             x_slc = outputs[slc_idx]
-            
             mul = torch.div(torch.matmul(outputs, x_slc.T), temperature)
-            eps = 1e-8
 
             # For numerical stability
             logits_max, _ = torch.max(mul, dim=1, keepdim=True)
             logits = mul - logits_max.detach()
 
             # Compute logarithmic probability
-            exp_logits = torch.exp(logits) * (mask1 * mask_certaion)
-            log_prob = (logits - torch.log((exp_logits.sum(1, keepdim=True)+eps))) * (mask1 * mask_certaion) 
+            exp_logits = torch.exp(logits) * (mask_slice * mask_certain)
+            log_prob = (logits - torch.log((exp_logits.sum(1, keepdim=True)+eps))) * (mask_slice * mask_certain) 
 
-            # Compute mean of log-likelihood over positive samples
+            # Compute mean of log-likelihood over positive samples for each point.
             # If no positve samples are found, take them as 0
             mean_log_prob_pos = (pos_mask * log_prob).sum(1) / (pos_mask.sum(1)+1e-12)
             self.pts_loss = - (temperature / base_temperature) * mean_log_prob_pos

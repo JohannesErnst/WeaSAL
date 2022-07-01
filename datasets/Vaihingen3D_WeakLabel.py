@@ -107,12 +107,9 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         else:
             ply_path = join(self.path, self.train_path)
 
-        # Define datasets and splits # clean this in the end -jer
-        # self.cloud_names = ['Vaihingen3D_Traininig_train', 'Vaihingen3D_Traininig_val', 'Vaihingen3D_EVAL_WITH_REF']
+        # Define datasets and splits
         self.cloud_names = ['Vaihingen3D_Training', 'Vaihingen3D_Training', 'Vaihingen3D_Testing']
-        #self.cloud_names = ['Vaihingen3D_Traininig_train', 'Vaihingen3D_Traininig_val']
         self.all_splits = [0, 1, 2]
-        # self.all_splits = [0, 1]
         self.validation_split = 1
         self.test_split = 2
 
@@ -357,12 +354,11 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             # Get points from tree structure
             points = np.array(self.input_trees[cloud_ind].data, copy=False)
 
-
             # Indices of points in input region
             input_inds = self.input_trees[cloud_ind].query_radius(center_point,
                                                                   r=self.config.in_radius)[0]
 
-            # Handle anchors for training
+            # Handle anchors for training (based on sub_radius, see Lin et al.)
             if self.set == 'training':
 
                 # Get anchor (i.e. subregion) index
@@ -388,7 +384,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
                     ypos = np.searchsorted(input_inds[ii_sorted], y)
                     idx = ii_sorted[ypos]                       # indices of subregion points in original point cloud
                     region_idx.append(idx)
-                    region_lb.append(pot_anchor_lb[pot_ans_idx])
+                    region_lb.append(pot_anchor_lb[pot_ans_idx]) # weak labels based on sub_radius
 
             t += [time.time()]
 
@@ -404,7 +400,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
                 t += [time.time()]
                 continue
 
-            # Collect weak cloud-labels and colors
+            # Collect weak cloud-labels and colors (based on in_radius, see Wei et al.)
             input_points = (points[input_inds] - center_point).astype(np.float32)
             input_colors = self.input_colors[cloud_ind][input_inds]
             if self.set in ['test', 'ERF']:
@@ -412,9 +408,9 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             else:
                 input_labels = self.input_labels[cloud_ind][input_inds] # collect all point labels
                 input_labels = np.array([self.label_to_idx[l] for l in input_labels])
-                cloud_labels_idx = np.unique(input_labels)              # create weak cloud-label
+                cloud_labels_idx = np.unique(input_labels)              # create weak cloud-labels
                 cloud_labels = np.zeros((1, self.config.num_classes))
-                cloud_labels[0][cloud_labels_idx] = 1
+                cloud_labels[0][cloud_labels_idx] = 1                   # weak labels based on in_radius
                 cloud_labels_all = np.ones((len(input_labels), self.config.num_classes))
                 cloud_labels_all = cloud_labels_all * cloud_labels      # apply weak label to all points in cloud
 
@@ -490,7 +486,8 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 
         t += [time.time()]
 
-        # Get the whole input list
+        # Get the whole input list (ground truth point-wise labels are still 
+        # passed here for accuracy monitoring during training)
         input_list = self.segmentation_inputs(stacked_points,
                                               stacked_features,
                                               labels,
@@ -1291,9 +1288,11 @@ class Vaihingen3DWLCustomBatch:
 
         # Get rid of batch dimension and check dimension
         input_list = input_list[0]
-        if len(input_list) == 27:
+        train_length = 27                       # length of input list passed for training
+        test_length = 23                        # length of input list passed for testing
+        if len(input_list) == train_length:
             L = (len(input_list) - 12) // 5     # number of layers for training
-        elif len(input_list) == 23:
+        elif len(input_list) == test_length:
             L = (len(input_list) - 8) // 5      # number of layers for testing/validation
         else:
             raise ValueError('Input list is incomplete for weak label classification')
@@ -1324,7 +1323,7 @@ class Vaihingen3DWLCustomBatch:
         ind += 1
         self.input_inds = torch.from_numpy(input_list[ind])
         ind += 1
-        if len(input_list) == 27:
+        if len(input_list) == train_length:
             self.cloud_lb = torch.from_numpy(input_list[ind])
             ind += 1
             self.cloud_all_lb = torch.from_numpy(input_list[ind])            
