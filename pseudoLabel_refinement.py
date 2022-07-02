@@ -82,8 +82,8 @@ def get_weak_labels_per_point(cloud_name, sub_folder, sub_radius, num_classes, a
 #       \******************************/
 
 
-# Define weak label log for pseudo label refinement
-weak_label_log = 'Log_2022-06-08_15-01-36'
+# Define weak label log for pseudo label refinement (from test/WeakLabel)
+weak_label_log = 'Log_2022-07-01_14-17-59'
 
 # Define threshold (in percent) for ignoring uncertain labels
 threshold = 20
@@ -93,7 +93,7 @@ config_path = join('results/WeakLabel', weak_label_log)
 config = Config()
 config.load(config_path)
 
-# Set paths and file list
+# Set paths and file list (select all training files)
 base_path = join('test/WeakLabel', weak_label_log)
 data_folder = join('data', config.dataset)[:-2]
 sub_folder = join(data_folder, 'input_{:.3f}'.format(config.first_subsampling_dl))

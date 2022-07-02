@@ -59,10 +59,10 @@ def model_choice(chosen_log):   # Make it run with /WeakLabel/ check if it works
         # List all training logs of either weak or pseudo label training
         if test_dataset[-2:] == 'WL':
             logs = np.sort([os.path.join('results/WeakLabel', f) 
-                            for f in os.listdir('results') if f.startswith('Log')])
+                            for f in os.listdir('results/WeakLabel') if f.startswith('Log')])
         else:
             logs = np.sort([os.path.join('results/PseudoLabel', f) 
-                            for f in os.listdir('results') if f.startswith('Log')])
+                            for f in os.listdir('results/PseudoLabel') if f.startswith('Log')])
 
         # Find the last log of asked dataset
         for log in logs[::-1]:
