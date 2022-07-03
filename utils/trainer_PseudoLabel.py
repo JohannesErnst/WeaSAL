@@ -512,20 +512,21 @@ class ModelTrainer:
                 # Add up confusions
                 labels = val_loader.dataset.validation_labels[i].astype(np.int32)
                 Confs += fast_confusion(labels, preds, val_loader.dataset.label_values).astype(np.int32)
-            
-            # Save confusions
-            c_path = join(val_path, 'conf.txt')
-            np.savetxt(c_path, Confs, delimiter=' ', fmt='%i')
-            cm_name = val_loader.dataset.name + '_' + val_loader.dataset.set
-            conf_matrix.plot(Confs, val_loader.dataset.label_to_names, 
-                             val_path, file_suffix=cm_name,
-                             abs_vals=False, F1=True, iou=True, show=False)
 
             # Remove ignored labels from confusions
             for l_ind, label_value in reversed(list(enumerate(val_loader.dataset.label_values))):
                 if label_value in val_loader.dataset.ignored_labels:
                     Confs = np.delete(Confs, l_ind, axis=0)
                     Confs = np.delete(Confs, l_ind, axis=1)
+
+            # Save confusions
+            c_path = join(val_path, 'conf.txt')
+            np.savetxt(c_path, Confs, delimiter=' ', fmt='%i')
+            cm_name = val_loader.dataset.name + '_' + val_loader.dataset.set
+            valid_label_names = dict.copy(val_loader.dataset.label_to_names)
+            del valid_label_names[10]
+            conf_matrix.plot(Confs, valid_label_names, val_path, file_suffix=cm_name, 
+                             abs_vals=False, F1=True, iou=True, show=False)
 
             # Print IoUs            
             IoUs = IoU_from_confusions(Confs)

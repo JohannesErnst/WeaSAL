@@ -34,6 +34,9 @@ from sklearn.neighbors import KDTree
 # PLY reader
 from utils.ply import read_ply, write_ply
 
+# Confusion matrix function
+import utils.conf_matrix as conf_matrix
+
 # Metrics
 from utils.metrics import IoU_from_confusions, fast_confusion
 from sklearn.metrics import confusion_matrix
@@ -315,9 +318,12 @@ class ModelTesterPL:
                         print(s)
                         print('-' * len(s) + '\n')
 
-                    # Save predictions
+                    # Save predictions without "ignore" labels
                     print('Saving clouds')
                     t1 = time.time()
+                    Confs = np.zeros((config.num_classes, config.num_classes), dtype=np.int32)
+                    remove_labels = np.where(test_loader.dataset.label_values == test_loader.dataset.ignored_labels)
+                    valid_label_list = np.delete(test_loader.dataset.label_values,remove_labels).tolist()
                     for i, file_path in enumerate(test_loader.dataset.files):
 
                         # Get file
@@ -347,9 +353,21 @@ class ModelTesterPL:
                                   [pot_points.astype(np.float32), pots],
                                   ['x', 'y', 'z', 'pots'])
 
+                        # Add up confusions for final confusion matrix
+                        labels = test_loader.dataset.validation_labels[i].astype(np.int32)
+                        Confs += conf_matrix.create(labels, preds, valid_label_list, valid_label_list)
+
                         # Save ascii preds
                         # ascii_name = join(test_path, 'predictions', cloud_name[:-4] + '.txt')
                         # np.savetxt(ascii_name, preds, fmt='%d')
+
+                    # Save confusion matrix without "ignore" label
+                    cm_path = join(test_path, 'predictions')
+                    cm_name = test_loader.dataset.name + '_' + test_loader.dataset.set
+                    valid_label_names = dict.copy(test_loader.dataset.label_to_names)
+                    del valid_label_names[10]
+                    conf_matrix.plot(Confs, valid_label_names, cm_path, file_suffix=cm_name,
+                                     abs_vals=False, F1=True, iou=True, show=False)
 
                     t2 = time.time()
                     print('Done in {:.1f} s\n'.format(t2 - t1))
