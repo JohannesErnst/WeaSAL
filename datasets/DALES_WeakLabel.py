@@ -7,7 +7,7 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Class handling Vaihingen dataset with pseudo labels.
+#      Class handling DALES dataset with weak region-labels (WL).
 #      Implements a Dataset, a Sampler, and a collate function
 #      - adapted by Johannes Ernst
 #
@@ -39,6 +39,7 @@ from utils.mayavi_visu import *
 
 from datasets.common import grid_subsampling
 from utils.config import bcolors
+from utils.anchors import *
 
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -46,39 +47,38 @@ from utils.config import bcolors
 #       \******************************/
 
 
-class Vaihingen3DPLDataset(PointCloudDataset):
-    """Class to handle Vaihingen dataset."""
+class DALESWLDataset(PointCloudDataset):
+    """Class to handle DALES dataset with weak region-labels (WL)."""
 
     def __init__(self, config, set='training', use_potentials=True, load_data=True):
         """
         This dataset is small enough to be stored in-memory, so load all point clouds here
         """
-        PointCloudDataset.__init__(self, 'Vaihingen3DPL')
+        PointCloudDataset.__init__(self, 'DALESWL')
 
         ############
         # Parameters
         ############
 
         # Dict from labels to names
-        self.label_to_names = {0:  'Powerline',
-                               1:  'LowVegetation',
-                               2:  'ImperviousSurfaces',
-                               3:  'Car',
-                               4:  'Fence/Hedge',
-                               5:  'Roof',
-                               6:  'Facade',
-                               7:  'Shrub',
-                               8:  'Tree',
-                               10: 'Ignore'}
+        self.label_to_names = {0: 'Unknown',
+                               1: 'Ground',
+                               2: 'Vegetation',
+                               3: 'Cars',
+                               4: 'Trucks',
+                               5: 'Power',
+                               6: 'Poles',
+                               7: 'Fences',
+                               8: 'Buildings'}
 
         # Initialize a bunch of variables concerning class labels
         self.init_labels()
 
         # List of classes ignored during training (can be empty)
-        self.ignored_labels = np.array([10])
+        self.ignored_labels = np.array([])
 
         # Dataset folder
-        self.path = 'data/Vaihingen3D'
+        self.path = 'data/DALES'
 
         # Type of task conducted on this dataset
         self.dataset_task = 'cloud_segmentation'
@@ -107,10 +107,50 @@ class Vaihingen3DPLDataset(PointCloudDataset):
             ply_path = join(self.path, self.train_path)
 
         # Define datasets and splits
-        self.cloud_names = ['Vaihingen3D_Training', 'Vaihingen3D_Training', 'Vaihingen3D_Testing']
-        self.all_splits = [0, 1, 2]
-        self.validation_split = 1
-        self.test_split = 2
+        self.cloud_names = ['5080_54435',
+                            '5085_54320',
+                            '5095_54440',
+                            '5095_54455',
+                            '5100_54495',
+                            '5105_54405',
+                            '5105_54460',
+                            '5110_54320',
+                            '5110_54460',
+                            '5110_54475',
+                            '5110_54495',
+                            '5115_54480',
+                            '5130_54355',
+                            '5135_54495',
+                            '5140_54445',
+                            '5145_54340',
+                            '5145_54405',
+                            '5145_54460',
+                            '5145_54470',
+                            '5145_54480',
+                            '5150_54340',
+                            '5160_54330',
+                            '5165_54390',
+                            '5165_54395',
+                            '5180_54435',
+                            '5180_54485',
+                            '5185_54390',
+                            '5185_54485',
+                            '5190_54400',
+                            'test_5080_54400',
+                            'test_5080_54470',
+                            'test_5100_54440',
+                            'test_5100_54490',
+                            'test_5120_54445',
+                            'test_5135_54430',
+                            'test_5135_54435',
+                            'test_5140_54390',
+                            'test_5150_54325',
+                            'test_5155_54335',
+                            'test_5175_54395']
+        self.all_splits = list(range(0,40))
+        self.validation_split = 28
+        self.test_split = list(range(29,40))
+
 
         # Number of models used per epoch
         if self.set == 'training':
@@ -118,7 +158,7 @@ class Vaihingen3DPLDataset(PointCloudDataset):
         elif self.set in ['validation', 'test', 'ERF']:
             self.epoch_n = config.validation_size * config.batch_num
         else:
-            raise ValueError('Unknown set for Vaihingen3DPL data: ', self.set)
+            raise ValueError('Unknown set for DALESWL data: ', self.set)
 
         # Stop data is not needed
         if not load_data:
@@ -128,7 +168,7 @@ class Vaihingen3DPLDataset(PointCloudDataset):
         # Prepare ply files
         ###################
 
-        self.prepare_Vaihingen3D_ply()
+        self.prepare_DALES_ply()
 
         ################
         # Load ply files
@@ -138,23 +178,23 @@ class Vaihingen3DPLDataset(PointCloudDataset):
         self.files = []
         for i, f in enumerate(self.cloud_names):
             if self.set == 'training':
-                if self.all_splits[i] != self.validation_split and self.all_splits[i] != self.test_split:
+                if self.all_splits[i] != self.validation_split and self.all_splits[i] not in self.test_split:
                     self.files += [join(ply_path, f + '.ply')]
             elif self.set == 'test':
-                if self.all_splits[i] == self.test_split:
+                if self.all_splits[i] in self.test_split:
                     self.files += [join(ply_path, f + '.ply')]
             elif self.set in ['validation', 'ERF']:
                 if self.all_splits[i] == self.validation_split:
                     self.files += [join(ply_path, f + '.ply')]
             else:
-                raise ValueError('Unknown set for Vaihingen3DPL data: ', self.set)
+                raise ValueError('Unknown set for DALESWL data: ', self.set)
 
         if self.set == 'training':
             self.cloud_names = [f for i, f in enumerate(self.cloud_names)
-                                if self.all_splits[i] != self.validation_split and self.all_splits[i] != self.test_split]
+                                if self.all_splits[i] != self.validation_split and self.all_splits[i] not in self.test_split]
         elif self.set == 'test':
             self.cloud_names = [f for i, f in enumerate(self.cloud_names)
-                                if self.all_splits[i] == self.test_split]
+                                if self.all_splits[i] in self.test_split]
         elif self.set in ['validation', 'ERF']:
             self.cloud_names = [f for i, f in enumerate(self.cloud_names)
                                 if self.all_splits[i] == self.validation_split]
@@ -164,7 +204,6 @@ class Vaihingen3DPLDataset(PointCloudDataset):
 
         # Initiate containers
         self.input_trees = []
-        self.input_colors = []
         self.input_labels = []
         self.pot_trees = []
         self.num_clouds = 0
@@ -181,6 +220,30 @@ class Vaihingen3DPLDataset(PointCloudDataset):
         # Initialize value for batch limit (max number of points per batch).
         self.batch_limit = torch.tensor([1], dtype=torch.float32)
         self.batch_limit.share_memory_()
+
+        # Define anchors (i.e. subregions of point cloud) for training
+        if self.set == 'training':
+            self.anchors = [] 
+            self.anchor_dicts = []
+            self.anchor_trees = [] 
+            self.anchor_lbs = [] 
+            for i, tree in enumerate(self.input_trees):
+                print('Preparing anchors and weak labels (' +
+                      str(i+1) + '/' + str(len(self.input_trees)) + ')')
+                points = np.array(tree.data)
+                anchor = get_anchors(
+                    points, config.sub_radius, xyz_offset=config.xyz_offset, method=config.anchor_method)
+                anchor, anchor_tree, anchors_dict, achor_lb = anchors_with_points(
+                    tree, anchor, self.input_labels[i], config.sub_radius, config.num_classes)
+
+                # Update subregion information according to overlaps
+                anchor, anchor_tree, anchors_dict, achor_lb = update_anchors(
+                    tree, anchor, anchor_tree, anchors_dict, achor_lb, config.sub_radius)
+
+                self.anchors += [anchor]
+                self.anchor_dicts += [anchors_dict]
+                self.anchor_trees += [anchor_tree]
+                self.anchor_lbs += [achor_lb]
 
         # Initialize potentials
         if use_potentials:
@@ -205,15 +268,8 @@ class Vaihingen3DPLDataset(PointCloudDataset):
             self.worker_waiting.share_memory_()
             self.epoch_inds = None
             self.epoch_i = 0
-
         else:
-            self.potentials = None
-            self.min_potentials = None
-            self.argmin_potentials = None
-            self.epoch_inds = torch.from_numpy(np.zeros((2, self.epoch_n), dtype=np.int64))
-            self.epoch_i = torch.from_numpy(np.zeros((1,), dtype=np.int64))
-            self.epoch_i.share_memory_()
-            self.epoch_inds.share_memory_()
+            raise NotImplementedError('Only potential selection is supported')
 
         self.worker_lock = Lock()
 
@@ -236,11 +292,7 @@ class Vaihingen3DPLDataset(PointCloudDataset):
         The main thread gives a list of indices to load a batch. Each worker is going to work in parallel to load a
         different list of indices.
         """
-
-        if self.use_potentials:
-            return self.potential_item(batch_i)
-        else:
-            return self.random_item(batch_i)
+        return self.potential_item(batch_i)
 
     def potential_item(self, batch_i, debug_workers=False):
 
@@ -255,6 +307,11 @@ class Vaihingen3DPLDataset(PointCloudDataset):
         ci_list = []
         s_list = []
         R_list = []
+        cl_list=[]
+        cla_list=[]
+        region_list = []
+        region_lb_list = []
+        cen_list = []
         batch_n = 0
         failed_attempts = 0
 
@@ -324,24 +381,54 @@ class Vaihingen3DPLDataset(PointCloudDataset):
                 if self.set != 'ERF':
                     tukeys = np.square(1 - d2s / np.square(self.config.in_radius))
                     tukeys[d2s > np.square(self.config.in_radius)] = 0
-                    self.potentials[cloud_ind][pot_inds] += tukeys
+                    if self.set != 'training':
+                        self.potentials[cloud_ind][pot_inds] += tukeys      # near to the center_point, higher weights will be added
+                    else:
+                        self.potentials[cloud_ind][point_ind] += 0.01
                     min_ind = torch.argmin(self.potentials[cloud_ind])
                     self.min_potentials[[cloud_ind]] = self.potentials[cloud_ind][min_ind]
-                    self.argmin_potentials[[cloud_ind]] = min_ind
+                    self.argmin_potentials[[cloud_ind]] = min_ind           # find the new point with minimum potential
 
             t += [time.time()]
 
             # Get points from tree structure
             points = np.array(self.input_trees[cloud_ind].data, copy=False)
 
-
             # Indices of points in input region
             input_inds = self.input_trees[cloud_ind].query_radius(center_point,
                                                                   r=self.config.in_radius)[0]
 
+            # Handle anchors for training (based on sub_radius, see Lin et al.)
+            if self.set == 'training':
+
+                # Get anchor (i.e. subregion) index
+                pot_anchor_tree = self.anchor_trees[cloud_ind]
+                pot_anchor_dict = self.anchor_dicts[cloud_ind]
+                pot_anchor_lb = self.anchor_lbs[cloud_ind]
+
+                # Search neighbouring anchors (i.e. anchors in input region)
+                pot_anchor_inds, dists = pot_anchor_tree.query_radius(center_point,
+                                                        r=self.config.in_radius-self.config.sub_radius-0.01,
+                                                        return_distance=True)
+
+                t += [time.time()]
+
+                # Map the ids in the original point clouds to the points in the selected subregion
+                region_idx = []
+                region_lb = []
+                for aa in range(pot_anchor_inds[0].shape[0]):   # for all neighbouring anchors
+                    pot_ans_idx = pot_anchor_inds[0][aa]        # get anchor id
+                    idx_r = pot_anchor_dict[pot_ans_idx][0][0]  # get corresponding points id
+                    y = idx_r[np.in1d(idx_r,input_inds)]        # filter out points that are in subregion but not input region
+                    ii_sorted = np.argsort(input_inds)          # sorted input indices
+                    ypos = np.searchsorted(input_inds[ii_sorted], y)
+                    idx = ii_sorted[ypos]                       # indices of subregion points in original point cloud
+                    region_idx.append(idx)
+                    region_lb.append(pot_anchor_lb[pot_ans_idx]) # weak labels based on sub_radius
+
             t += [time.time()]
 
-            # Number collected
+            # Number of collected points in input region
             n = input_inds.shape[0]
 
             # Safe check for empty spheres
@@ -353,26 +440,26 @@ class Vaihingen3DPLDataset(PointCloudDataset):
                 t += [time.time()]
                 continue
 
-            # Collect labels and colors
+            # Collect weak cloud-labels and colors (based on in_radius, see Wei et al.)
             input_points = (points[input_inds] - center_point).astype(np.float32)
-            input_colors = self.input_colors[cloud_ind][input_inds]
             if self.set in ['test', 'ERF']:
                 input_labels = np.zeros(input_points.shape[0])
             else:
-                input_labels = self.input_labels[cloud_ind][input_inds]
+                input_labels = self.input_labels[cloud_ind][input_inds] # collect all point labels
                 input_labels = np.array([self.label_to_idx[l] for l in input_labels])
+                cloud_labels_idx = np.unique(input_labels)              # create weak cloud-labels
+                cloud_labels = np.zeros((1, self.config.num_classes))
+                cloud_labels[0][cloud_labels_idx] = 1                   # weak labels based on in_radius
+                cloud_labels_all = np.ones((len(input_labels), self.config.num_classes))
+                cloud_labels_all = cloud_labels_all * cloud_labels      # apply weak label to all points in cloud
 
             t += [time.time()]
 
             # Data augmentation
             input_points, scale, R = self.augmentation_transform(input_points)
 
-            # Color augmentation
-            if np.random.rand() > self.config.augment_color:
-                input_colors *= 0
-
             # Get original height as additional feature
-            input_features = np.hstack((input_colors, input_points[:, 2:] + center_point[:, 2:], input_points[:, 2:])).astype(np.float32)
+            input_features = np.hstack((input_points[:, 2:] + center_point[:, 2:], input_points[:, 2:])).astype(np.float32)
 
             t += [time.time()]
 
@@ -385,18 +472,17 @@ class Vaihingen3DPLDataset(PointCloudDataset):
             ci_list += [cloud_ind]
             s_list += [scale]
             R_list += [R]
+            cen_list += [center_point]
+            if self.set == 'training':
+                cl_list += [cloud_labels]
+                cla_list += [cloud_labels_all]            
+                region_list += [region_idx]
+                region_lb_list += [region_lb]
 
-            # Update batch size
+            # Update batch size and stop in case batch is full
             batch_n += n
-
-            # In case batch is full, stop
             if batch_n > int(self.batch_limit):
                 break
-
-            # Randomly drop some points (act as an augmentation process and a safety for GPU memory consumption)
-            # if n > int(self.batch_limit):
-            #    input_inds = np.random.choice(input_inds, size=int(self.batch_limit) - 1, replace=False)
-            #    n = input_inds.shape[0]
 
         ###################
         # Concatenate batch
@@ -411,17 +497,19 @@ class Vaihingen3DPLDataset(PointCloudDataset):
         stack_lengths = np.array([pp.shape[0] for pp in p_list], dtype=np.int32)
         scales = np.array(s_list, dtype=np.float32)
         rots = np.stack(R_list, axis=0)
+        cen_pts = np.concatenate(cen_list, axis=0).astype('float32')
+        if self.set == 'training':
+            cloud_lb = np.concatenate(cl_list, axis=0).astype('float32')
+            cloud_all_lb = np.concatenate(cla_list, axis=0).astype('float32')
 
-        # Input features (4 means [ones  intensity absoluteHeight reducedHeight])
+        # Input features (3 means [ones absoluteHeight reducedHeight])
         stacked_features = np.ones_like(stacked_points[:, :1], dtype=np.float32)
         if self.config.in_features_dim == 1:
             pass
-        elif self.config.in_features_dim == 2:
-            stacked_features = np.hstack((stacked_features, features[:, :1]))
-        elif self.config.in_features_dim == 4:
-            stacked_features = np.hstack((stacked_features, features[:, :3]))
+        elif self.config.in_features_dim == 3:
+            stacked_features = np.hstack((stacked_features, features[:, :2]))
         else:
-            raise ValueError('Only accepted input dimensions are 1, 2 and 4')
+            raise ValueError('Only accepted input dimensions are 1 and 3')
 
         #######################
         # Create network inputs
@@ -432,7 +520,8 @@ class Vaihingen3DPLDataset(PointCloudDataset):
 
         t += [time.time()]
 
-        # Get the whole input list
+        # Get the whole input list (ground truth point-wise labels are still 
+        # passed here for accuracy monitoring during training)
         input_list = self.segmentation_inputs(stacked_points,
                                               stacked_features,
                                               labels,
@@ -440,8 +529,12 @@ class Vaihingen3DPLDataset(PointCloudDataset):
 
         t += [time.time()]
 
-        # Add scale and rotation for testing
-        input_list += [scales, rots, cloud_inds, point_inds, input_inds]
+        # Add scale, rotation and labels to input list
+        if self.set == 'training':
+            input_list += [scales, rots, cloud_inds, point_inds, input_inds,
+                           cloud_lb, cloud_all_lb, region_list, region_lb_list, cen_pts]
+        else:
+            input_list += [scales, rots, cloud_inds, point_inds, input_inds, cen_pts]
 
         if debug_workers:
             message = ''
@@ -505,138 +598,10 @@ class Vaihingen3DPLDataset(PointCloudDataset):
             print('\n************************\n')
         return input_list
 
-    def random_item(self, batch_i):
-
-        # Initiate concatanation lists
-        p_list = []
-        f_list = []
-        l_list = []
-        i_list = []
-        pi_list = []
-        ci_list = []
-        s_list = []
-        R_list = []
-        batch_n = 0
-
-        while True:
-
-            with self.worker_lock:
-
-                # Get potential minimum
-                cloud_ind = int(self.epoch_inds[0, self.epoch_i])
-                point_ind = int(self.epoch_inds[1, self.epoch_i])
-
-                # Update epoch indice
-                self.epoch_i += 1
-                if self.epoch_i >= int(self.epoch_inds.shape[1]):
-                    self.epoch_i -= int(self.epoch_inds.shape[1])
-                
-
-            # Get points from tree structure
-            points = np.array(self.input_trees[cloud_ind].data, copy=False)
-
-            # Center point of input region
-            center_point = points[point_ind, :].reshape(1, -1)
-
-            # Add a small noise to center point
-            if self.set != 'ERF':
-                center_point += np.random.normal(scale=self.config.in_radius / 10, size=center_point.shape)
-
-            # Indices of points in input region
-            input_inds = self.input_trees[cloud_ind].query_radius(center_point,
-                                                                  r=self.config.in_radius)[0]
-
-            # Number collected
-            n = input_inds.shape[0]
-
-            # Collect labels and colors
-            input_points = (points[input_inds] - center_point).astype(np.float32)
-            input_colors = self.input_colors[cloud_ind][input_inds]
-            if self.set in ['test', 'ERF']:
-                input_labels = np.zeros(input_points.shape[0])
-            else:
-                input_labels = self.input_labels[cloud_ind][input_inds]
-                input_labels = np.array([self.label_to_idx[l] for l in input_labels])
-
-            # Data augmentation
-            input_points, scale, R = self.augmentation_transform(input_points)
-
-            # Color augmentation
-            if np.random.rand() > self.config.augment_color:
-                input_colors *= 0
-
-            # Get original height as additional feature
-            # (Using intensity, height and reduced height as "color" / features)
-            input_features = np.hstack((input_colors, input_points[:, 2:] + center_point[:, 2:], input_points[:, 2:])).astype(np.float32)
-
-            # Stack batch
-            p_list += [input_points]
-            f_list += [input_features]
-            l_list += [input_labels]
-            pi_list += [input_inds]
-            i_list += [point_ind]
-            ci_list += [cloud_ind]
-            s_list += [scale]
-            R_list += [R]
-
-            # Update batch size
-            batch_n += n
-
-            # In case batch is full, stop
-            if batch_n > int(self.batch_limit):
-                break
-
-            # Randomly drop some points (act as an augmentation process and a safety for GPU memory consumption)
-            # if n > int(self.batch_limit):
-            #    input_inds = np.random.choice(input_inds, size=int(self.batch_limit) - 1, replace=False)
-            #    n = input_inds.shape[0]
-
-        ###################
-        # Concatenate batch
-        ###################
-
-        stacked_points = np.concatenate(p_list, axis=0)
-        features = np.concatenate(f_list, axis=0)
-        labels = np.concatenate(l_list, axis=0)
-        point_inds = np.array(i_list, dtype=np.int32)
-        cloud_inds = np.array(ci_list, dtype=np.int32)
-        input_inds = np.concatenate(pi_list, axis=0)
-        stack_lengths = np.array([pp.shape[0] for pp in p_list], dtype=np.int32)
-        scales = np.array(s_list, dtype=np.float32)
-        rots = np.stack(R_list, axis=0)
-
-        # Input features (4 means [ones  intensity absoluteHeight reducedHeight])
-        stacked_features = np.ones_like(stacked_points[:, :1], dtype=np.float32)
-        if self.config.in_features_dim == 1:
-            pass
-        elif self.config.in_features_dim == 2:
-            stacked_features = np.hstack((stacked_features, features[:, :1]))
-        elif self.config.in_features_dim == 4:
-            stacked_features = np.hstack((stacked_features, features[:, :3]))
-        else:
-            raise ValueError('Only accepted input dimensions are 1, 2 and 4')
-
-        #######################
-        # Create network inputs
-        #######################
-        #
-        #   Points, neighbors, pooling indices for each layers
-        #
-
-        # Get the whole input list
-        input_list = self.segmentation_inputs(stacked_points,
-                                              stacked_features,
-                                              labels,
-                                              stack_lengths)
-
-        # Add scale and rotation for testing
-        input_list += [scales, rots, cloud_inds, point_inds, input_inds]
-
-        return input_list
-
-    def prepare_Vaihingen3D_ply(self):
+    def prepare_DALES_ply(self):
         # Preparing files by reducing coordinates and converting to float32
-        
+
+        print('\nPreparing ply files')
         t0 = time.time()
 
         # Folder for the ply files
@@ -651,17 +616,13 @@ class Vaihingen3DPLDataset(PointCloudDataset):
         data = read_ply(join(self.path, self.cloud_names[0] + '.ply'))
         offset = np.vstack((data['x'][0], data['y'][0], data['z'][0])).T
 
-        # Assign validation and test cloud names
-        # Note: Train clouds are skipped here because they are already processed
-        if self.set == 'training':
-            return
-        elif self.set == 'test':
-            cloud_names_sort = [self.cloud_names[self.test_split]]
-        elif self.set == 'validation':
-            cloud_names_sort = [self.cloud_names[self.validation_split]]
+        # Assign training/validation and test cloud names
+        if self.set == 'test':                  # test this -jer
+            cloud_names_sort = [self.cloud_names[self.test_split]]      
+        else:
+            cloud_names_sort = self.cloud_names[0:self.test_split[0]]
 
         # Prepare all clouds
-        print('\nPreparing ply files')
         for cloud_name in cloud_names_sort:
 
             # Pass if the cloud has already been computed
@@ -671,7 +632,6 @@ class Vaihingen3DPLDataset(PointCloudDataset):
 
             # Initiate containers
             cloud_points = np.empty((0, 3), dtype=np.float32)
-            cloud_colors = np.empty((0, 1), dtype=np.uint8)
             cloud_classes = np.empty((0, 1), dtype=np.int32)
 
             # Read ply file
@@ -682,16 +642,13 @@ class Vaihingen3DPLDataset(PointCloudDataset):
             # Reduce coordinates by fixed offset and convert to float32
             cloud_points = (points - offset).astype(np.float32)
 
-            # Define "color" as intensity
-            cloud_colors = (data['scalar_Intensity'].T).astype(np.uint8)
-
             # Get point classes
             cloud_classes = (np.vstack(data['scalar_Classification'])).astype(np.int32)
             
             # Save as ply
             write_ply(cloud_file,
-                      (cloud_points, cloud_colors, cloud_classes),
-                      ['x', 'y', 'z', 'intensity', 'class'])
+                      (cloud_points, cloud_classes),
+                      ['x', 'y', 'z', 'class'])
 
         print('Done in {:.1f}s'.format(time.time() - t0))
         return
@@ -726,54 +683,28 @@ class Vaihingen3DPLDataset(PointCloudDataset):
             if exists(KDTree_file):
                 print('\nFound KDTree for cloud {:s}, subsampled at {:.3f}'.format(cloud_name, dl))
 
-                if self.set in ['validation', 'test']:    
+                # Read ply with data
+                data = read_ply(sub_ply_file)
+                sub_labels = data['class']
 
-                    # Read ply with data
-                    data = read_ply(sub_ply_file)
-                    sub_colors = data['intensity'].T
-                    sub_labels = data['class']
+                # Read pkl with search tree
+                with open(KDTree_file, 'rb') as f:
+                    search_tree = pickle.load(f)
 
-                    if len(sub_colors.shape) == 1:
-                        sub_colors = np.expand_dims(sub_colors, axis=-1)
-
-                    # Read pkl with search tree
-                    with open(KDTree_file, 'rb') as f:
-                        search_tree = pickle.load(f)
-                else:
-
-                    # Read ply and pseudo labels
-                    data = read_ply(sub_ply_file)
-                    pseudo_labels = join(self.path, 'PseudoLabels', self.config.weak_label_log,
-                                         cloud_name + '_t' + str(self.config.contrast_thd) + '_pseudo.txt')
-                    sub_labels = np.genfromtxt(pseudo_labels).astype('int32')
-                    sub_colors = data['intensity'].T
-                    
-                    # Make sure sub_colors has the right dimension
-                    if len(sub_colors.shape) == 1:
-                        sub_colors = np.expand_dims(sub_colors, axis=-1)
-                    
-                    # Read pkl with search tree
-                    with open(KDTree_file, 'rb') as f:
-                        search_tree = pickle.load(f)
-                        
             else:
                 print('\nPreparing KDTree for cloud {:s}, subsampled at {:.3f}'.format(cloud_name, dl))
 
                 # Read ply file
                 data = read_ply(file_path)
                 points = np.vstack((data['x'], data['y'], data['z'])).T
-                colors = data['intensity'].T
-                colors = np.expand_dims(colors, axis=-1)
                 labels = data['class']
 
                 # Subsample cloud
-                sub_points, sub_colors, sub_labels = grid_subsampling(points,
-                                                                      features=colors,
-                                                                      labels=labels,
-                                                                      sampleDl=dl)
+                sub_points, sub_labels = grid_subsampling(points,
+                                                          labels=labels,
+                                                          sampleDl=dl)
 
-                # Rescale float color and squeeze label
-                sub_colors = sub_colors / 255
+                # Squeeze labels
                 sub_labels = np.squeeze(sub_labels)
 
                 # Get chosen neighborhoods
@@ -787,15 +718,14 @@ class Vaihingen3DPLDataset(PointCloudDataset):
 
                 # Save ply
                 write_ply(sub_ply_file,
-                          [sub_points, sub_colors, sub_labels],
-                          ['x', 'y', 'z', 'intensity', 'class'])
+                          [sub_points, sub_labels],
+                          ['x', 'y', 'z', 'class'])
 
             # Fill data containers
             self.input_trees += [search_tree]
-            self.input_colors += [sub_colors]
             self.input_labels += [sub_labels]
 
-            size = sub_colors.shape[0] * 4 * 5
+            size = sub_labels.shape[0] * 4 * 5
             print('{:.1f} MB loaded in {:.1f}s'.format(size * 1e-6, time.time() - t0))
 
         ############################
@@ -822,7 +752,7 @@ class Vaihingen3DPLDataset(PointCloudDataset):
 
                 # Check if inputs have already been computed
                 if exists(coarse_KDTree_file):
-
+                    
                     # Read pkl with search tree
                     with open(coarse_KDTree_file, 'rb') as f:
                         search_tree = pickle.load(f)
@@ -910,10 +840,10 @@ class Vaihingen3DPLDataset(PointCloudDataset):
 #       \********************************/
 
 
-class Vaihingen3DPLSampler(Sampler):
-    """Sampler for Vaihingen3DPL"""
+class DALESWLSampler(Sampler):
+    """Sampler for DALESWL"""
 
-    def __init__(self, dataset: Vaihingen3DPLDataset):
+    def __init__(self, dataset: DALESWLDataset):
         Sampler.__init__(self, dataset)
 
         # Dataset used by the sampler (no copy is made in memory)
@@ -1096,7 +1026,7 @@ class Vaihingen3DPLSampler(Sampler):
         if self.dataset.use_potentials:
             sampler_method = 'potentials'
         else:
-            sampler_method = 'random'
+            raise NotImplementedError('Only potential selection is supported')
         key = '{:s}_{:.3f}_{:.3f}_{:d}'.format(sampler_method,
                                                self.dataset.config.in_radius,
                                                self.dataset.config.first_subsampling_dl,
@@ -1243,7 +1173,7 @@ class Vaihingen3DPLSampler(Sampler):
 
                     # Save smooth errors for convergene check
                     smooth_errors.append(target_b - estim_b)
-                    if len(smooth_errors) > 30:
+                    if len(smooth_errors) > 10:
                         smooth_errors = smooth_errors[1:]
 
                     # Update batch limit with P controller
@@ -1346,7 +1276,7 @@ class Vaihingen3DPLSampler(Sampler):
             if self.dataset.use_potentials:
                 sampler_method = 'potentials'
             else:
-                sampler_method = 'random'
+                raise NotImplementedError('Only potential selection is supported')
             key = '{:s}_{:.3f}_{:.3f}_{:d}'.format(sampler_method,
                                                    self.dataset.config.in_radius,
                                                    self.dataset.config.first_subsampling_dl,
@@ -1372,17 +1302,22 @@ class Vaihingen3DPLSampler(Sampler):
         return
 
 
-class Vaihingen3DPLCustomBatch:
-    """Custom batch definition with memory pinning for Vaihingen3DPL"""
+class DALESWLCustomBatch:
+    """Custom batch definition with memory pinning for DALESWL"""
 
     def __init__(self, input_list):
 
-        # Get rid of batch dimension
+        # Get rid of batch dimension and check dimension
         input_list = input_list[0]
-
-        # Number of layers
-        L = (len(input_list) - 7) // 5
-
+        train_length = 27                       # length of input list passed for training
+        test_length = 23                        # length of input list passed for testing
+        if len(input_list) == train_length:
+            L = (len(input_list) - 12) // 5     # number of layers for training
+        elif len(input_list) == test_length:
+            L = (len(input_list) - 8) // 5      # number of layers for testing/validation
+        else:
+            raise ValueError('Input list is incomplete for weak label classification')
+            
         # Extract input tensors from the list of numpy array
         ind = 0
         self.points = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
@@ -1408,6 +1343,17 @@ class Vaihingen3DPLCustomBatch:
         self.center_inds = torch.from_numpy(input_list[ind])
         ind += 1
         self.input_inds = torch.from_numpy(input_list[ind])
+        ind += 1
+        if len(input_list) == train_length:
+            self.cloud_lb = torch.from_numpy(input_list[ind])
+            ind += 1
+            self.cloud_all_lb = torch.from_numpy(input_list[ind])            
+            ind += 1
+            self.region = input_list[ind]
+            ind += 1
+            self.region_lb = input_list[ind]  
+            ind += 1
+        self.center_pts = torch.from_numpy(input_list[ind])
 
         return
 
@@ -1428,7 +1374,13 @@ class Vaihingen3DPLCustomBatch:
         self.cloud_inds = self.cloud_inds.pin_memory()
         self.center_inds = self.center_inds.pin_memory()
         self.input_inds = self.input_inds.pin_memory()
-
+        if hasattr(self, 'cloud_lb'):
+            self.cloud_lb = self.cloud_lb.pin_memory()
+        if hasattr(self, 'cloud_all_lb'):
+            self.cloud_all_lb = self.cloud_all_lb.pin_memory()
+        if hasattr(self, 'center_pts'):    
+            self.center_pts = self.center_pts.pin_memory()
+        
         return self
 
     def to(self, device):
@@ -1445,7 +1397,13 @@ class Vaihingen3DPLCustomBatch:
         self.cloud_inds = self.cloud_inds.to(device)
         self.center_inds = self.center_inds.to(device)
         self.input_inds = self.input_inds.to(device)
-
+        if hasattr(self, 'cloud_lb'):
+            self.cloud_lb = self.cloud_lb.to(device)
+        if hasattr(self, 'cloud_all_lb'):
+            self.cloud_all_lb = self.cloud_all_lb.to(device)
+        if hasattr(self, 'center_pts'):
+            self.center_pts = self.center_pts.to(device)
+        
         return self
 
     def unstack_points(self, layer=None):
@@ -1511,8 +1469,8 @@ class Vaihingen3DPLCustomBatch:
         return all_p_list
 
 
-def Vaihingen3DPLCollate(batch_data):
-    return Vaihingen3DPLCustomBatch(batch_data)
+def DALESWLCollate(batch_data):
+    return DALESWLCustomBatch(batch_data)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

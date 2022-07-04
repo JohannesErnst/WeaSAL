@@ -7,7 +7,7 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Callable script to start a training with pseudo labels on Vaihingen3D dataset.
+#      Callable script to start a training with pseudo labels (PL) on Vaihingen3D dataset.
 #      This is based on the standard KPConv architecture.
 #      - adapted by Johannes Ernst
 #
@@ -162,10 +162,9 @@ class Vaihingen3DPLConfig(Config):
     augment_scale_anisotropic = True
     augment_symmetries = [True, True, True]     # describes symmetry of scale factor in x, y and z
     augment_rotation = 'vertical'
-    augment_scale_min = 0.3
-    augment_scale_max = 1.8
+    augment_scale_min = 0.2
+    augment_scale_max = 1.9
     augment_noise = 0.06
-    augment_color = 0.6
 
     # Enable dropout
     dropout = 0.5

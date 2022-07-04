@@ -106,7 +106,6 @@ def update_anchors(input_tree, clean_anchors, anchor_tree, anchors_dict, anchor_
     """
     cc = len(anchors_dict.keys())
     points = np.array(input_tree.data)
-    print('Updating anchors:')
     print('Anchors without considering overlap: {:.0f}'.format(cc))
 
     # Search neighbouring anchors

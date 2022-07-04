@@ -118,8 +118,7 @@ for file in refinement_list:
     points_orig = np.array([data_orig['x'], data_orig['y'], data_orig['z']]).T
 
     # Get point neighbours and indices of points in original cloud
-    nbrs = NearestNeighbors(
-        n_neighbors=1, algorithm='kd_tree').fit(points[:, :3])
+    nbrs = NearestNeighbors(n_neighbors=1, algorithm='kd_tree').fit(points[:, :3])
     distance, indices = nbrs.kneighbors(points_orig[:, :3])
     indices = np.squeeze(indices)
 

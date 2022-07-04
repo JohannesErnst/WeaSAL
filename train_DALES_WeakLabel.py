@@ -7,7 +7,7 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Callable script to start a training with weak region-labels (WL) on Vaihingen3D dataset.
+#      Callable script to start a training with weak region-labels (WL) on DALES dataset.
 #      This is based on the multi-path region mining (mprm) approach.
 #      - adapted by Johannes Ernst
 #
@@ -27,7 +27,7 @@ import os
 import time
 
 # Dataset
-from datasets.Vaihingen3D_WeakLabel import *
+from datasets.DALES_WeakLabel import *
 from torch.utils.data import DataLoader
 
 # Utils
@@ -42,7 +42,7 @@ from models.architectures import *
 #       \******************/
 #
 
-class Vaihingen3DWLConfig(Config):
+class DALESWLConfig(Config):
     """
     Override the parameters you want to modify for this dataset
     """
@@ -52,7 +52,7 @@ class Vaihingen3DWLConfig(Config):
     ####################
 
     # Dataset name
-    dataset = 'Vaihingen3DWL'
+    dataset = 'DALESWL'
 
     # Number of classes in the dataset (This value is overwritten by dataset class when Initializating dataset).
     num_classes = None
@@ -86,13 +86,13 @@ class Vaihingen3DWLConfig(Config):
     num_kernel_points = 15
 
     # Radius of the input sphere (decrease value to reduce memory cost)
-    in_radius = 24
+    in_radius = 20
 
     # Radius of the subcloud for weak labels (smaller means more labels but better results)
-    sub_radius = 6
+    sub_radius = 5
 
     # Size of the first subsampling grid in meter (increase value to reduce memory cost)
-    first_subsampling_dl = 0.24
+    first_subsampling_dl = 0.4
 
     # Radius of convolution in "number grid cell" (2.5 is the standard value)
     conv_radius = 2.5
@@ -109,16 +109,16 @@ class Vaihingen3DWLConfig(Config):
     # Aggregation function of KPConv in ('closest', 'sum')
     aggregation_mode = 'sum'
 
-    # Choice of input features (4 here means [ones  intensity absoluteHeight reducedHeight])
-    first_features_dim = 64
-    in_features_dim = 4
+    # Choice of input features (3 here means [ones  absoluteHeight reducedHeight])
+    first_features_dim = 128
+    in_features_dim = 3
 
     # Can the network learn modulations
     modulated = False
 
     # Batch normalization parameters
     use_batch_norm = True
-    batch_norm_momentum = 0.02
+    batch_norm_momentum = 0.98
 
     # Deformable offset loss
     # 'point2point' fitting geometry by penalizing distance from deform point to input points
@@ -133,39 +133,39 @@ class Vaihingen3DWLConfig(Config):
     #####################
 
     # Maximal number of epochs
-    max_epoch = 80
+    max_epoch = 100
 
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
     momentum = 0.98
-    lr_decays = {i: 0.98 for i in range(1, 1000)}
-    grad_clip_norm = 1
+    lr_decays = {i: 0.1 ** (1 / 150) for i in range(1, max_epoch)}
+    grad_clip_norm = 100.0
 
     # Number of batch (or number of input spheres)
-    batch_num = 3
+    batch_num = 4
 
     # Number of steps per epochs
-    epoch_steps = 600
+    epoch_steps = 250
 
     # Number of validation examples per epoch
     validation_size = 50
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 10
+    checkpoint_gap = 50
 
     # Augmentations
     augment_scale_anisotropic = True
     augment_symmetries = [True, True, False]
     augment_rotation = 'vertical'
-    augment_scale_min = 0.8
-    augment_scale_max = 1.2
-    augment_noise = 0.04
+    augment_scale_min = 0.9
+    augment_scale_max = 1.1
+    augment_noise = 0.01
 
     # Choose weights for class
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 
     # Enable dropout
-    dropout = 0.5
+    dropout = 0
 
     # Other parameters
     model_name = 'KPFCNN_mprm_ele'
@@ -231,7 +231,7 @@ if __name__ == '__main__':
     print('****************')
 
     # Initialize configuration class
-    config = Vaihingen3DWLConfig()
+    config = DALESWLConfig()
     if previous_training_path:
         config.load(os.path.join('results/WeakLabel', previous_training_path))
         config.saving_path = None
@@ -241,24 +241,24 @@ if __name__ == '__main__':
         config.saving_path = sys.argv[1]
 
     # Initialize datasets
-    training_dataset = Vaihingen3DWLDataset(config, set='training', use_potentials=True)
-    test_dataset = Vaihingen3DWLDataset(config, set='validation', use_potentials=True)
+    training_dataset = DALESWLDataset(config, set='training', use_potentials=True)
+    test_dataset = DALESWLDataset(config, set='validation', use_potentials=True)
 
     # Initialize samplers
-    training_sampler = Vaihingen3DWLSampler(training_dataset)
-    test_sampler = Vaihingen3DWLSampler(test_dataset)
+    training_sampler = DALESWLSampler(training_dataset)
+    test_sampler = DALESWLSampler(test_dataset)
 
     # Initialize the dataloader
     training_loader = DataLoader(training_dataset,
                                  batch_size=1,
                                  sampler=training_sampler,
-                                 collate_fn=Vaihingen3DWLCollate,
+                                 collate_fn=DALESWLCollate,
                                  num_workers=config.input_threads,
                                  pin_memory=True)
     test_loader = DataLoader(test_dataset,
                              batch_size=1,
                              sampler=test_sampler,
-                             collate_fn=Vaihingen3DWLCollate,
+                             collate_fn=DALESWLCollate,
                              num_workers=config.input_threads,
                              pin_memory=True)
 

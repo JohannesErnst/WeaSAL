@@ -21,14 +21,12 @@
 #
 
 # Common libs
-import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from os.path import isfile, join, exists
 from os import listdir, remove, getcwd
 from sklearn.metrics import confusion_matrix
-import time
 
 # My libs
 from utils.config import Config
@@ -38,6 +36,8 @@ from utils.ply import read_ply
 # Datasets
 from datasets.Vaihingen3D_WeakLabel import Vaihingen3DWLDataset
 from datasets.Vaihingen3D_PseudoLabel import Vaihingen3DPLDataset
+from datasets.DALES_WeakLabel import DALESWLDataset
+from datasets.DALES_PseudoLabel import DALESPLDataset
 
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -835,14 +835,17 @@ if __name__ == '__main__':
         if config.dataset.startswith('Vaihingen3DWL'):
             dataset = Vaihingen3DWLDataset(config, load_data=False)
             compare_convergences_segment(dataset, logs, logs_names) 
-        elif config.dataset.startswith('Vaihingen3DPL'):          # chekc if this works with PL and WL -jer
+        elif config.dataset.startswith('Vaihingen3DPL'):
             dataset = Vaihingen3DPLDataset(config, load_data=False)
             compare_convergences_segment(dataset, logs, logs_names) 
+        elif config.dataset.startswith('DALESWL'):
+            dataset = DALESWLDataset(config, load_data=False)
+            compare_convergences_segment(dataset, logs, logs_names)
+        elif config.dataset.startswith('DALESPL'):
+            dataset = DALESPLDataset(config, load_data=False)
+            compare_convergences_segment(dataset, logs, logs_names)
         else:
             raise ValueError('Unsupported dataset : ' + plot_dataset)
-        # elif config.dataset.startswith('DALES'):
-        #     dataset = DALESDataset(config, load_data=False)
-        #     compare_convergences_segment(dataset, logs, logs_names)
     else:
         raise ValueError('Unsupported dataset : ' + plot_dataset)
 

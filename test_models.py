@@ -21,15 +21,14 @@
 #
 
 # Common libs
-import signal
 import os
 import numpy as np
-import sys
-import torch
 
 # Dataset
 from datasets.Vaihingen3D_WeakLabel import *
 from datasets.Vaihingen3D_PseudoLabel import *
+from datasets.DALES_WeakLabel import *
+from datasets.DALES_PseudoLabel import *
 from torch.utils.data import DataLoader
 
 from utils.config import Config
@@ -44,7 +43,7 @@ from models.architectures import *
 #       \***************/
 #
 
-def model_choice(chosen_log):   # Make it run with /WeakLabel/ check if it works -jer
+def model_choice(chosen_log):
 
     ###########################
     # Call the test initializer
@@ -176,11 +175,14 @@ if __name__ == '__main__':
         test_dataset = Vaihingen3DPLDataset(config, set=set, use_potentials=True)
         test_sampler = Vaihingen3DPLSampler(test_dataset)
         collate_fn = Vaihingen3DPLCollate
-    elif config.dataset == 'DALES':
-        print("Not implemented")
-        # test_dataset = DALESDataset(config, set=set, use_potentials=True)
-        # test_sampler = DALESSampler(test_dataset)
-        # collate_fn = DALESCollate
+    elif config.dataset == 'DALESWL':
+        test_dataset = DALESWLDataset(config, set=set, use_potentials=True)
+        test_sampler = DALESWLSampler(test_dataset)
+        collate_fn = DALESWLCollate
+    elif config.dataset == 'DALESPL':
+        test_dataset = DALESPLDataset(config, set=set, use_potentials=True)
+        test_sampler = DALESPLSampler(test_dataset)
+        collate_fn = DALESPLCollate
     else:
         raise ValueError('Unsupported dataset : ' + config.dataset)
 

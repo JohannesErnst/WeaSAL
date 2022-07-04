@@ -7,7 +7,7 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Class handling Vaihingen dataset with weak region-labels.
+#      Class handling Vaihingen dataset with weak region-labels (WL).
 #      Implements a Dataset, a Sampler, and a collate function
 #      - adapted by Johannes Ernst
 #
@@ -26,7 +26,6 @@ import time
 import numpy as np
 import pickle
 import torch
-import math
 from multiprocessing import Lock
 
 # OS functions
@@ -190,6 +189,8 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             self.anchor_trees = [] 
             self.anchor_lbs = [] 
             for i, tree in enumerate(self.input_trees):
+                print('Preparing anchors and weak labels (' +
+                      str(i+1) + '/' + str(len(self.input_trees)) + ')')
                 points = np.array(tree.data)
                 anchor = get_anchors(
                     points, config.sub_radius, xyz_offset=config.xyz_offset, method=config.anchor_method)
@@ -444,6 +445,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
                 region_list += [region_idx]
                 region_lb_list += [region_lb]
 
+            # Update batch size and stop in case batch is full
             batch_n += n
             if batch_n > int(self.batch_limit):
                 break
