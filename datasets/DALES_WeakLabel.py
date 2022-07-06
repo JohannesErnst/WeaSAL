@@ -230,19 +230,35 @@ class DALESWLDataset(PointCloudDataset):
             for i, tree in enumerate(self.input_trees):
                 print('Preparing anchors and weak labels (' +
                       str(i+1) + '/' + str(len(self.input_trees)) + ')')
-                points = np.array(tree.data)
-                anchor = get_anchors(points, config.sub_radius, method=config.anchor_method)
-                anchor, anchor_tree, anchors_dict, achor_lb = anchors_with_points(
-                    tree, anchor, self.input_labels[i], config.sub_radius, config.num_classes)
+                anchors_file = join(self.tree_path, '{:s}_anchors.pkl'.format(self.cloud_names[i]))
 
-                # Update subregion information according to overlaps
-                anchor, anchor_tree, anchors_dict, achor_lb = update_anchors(
-                    tree, anchor, anchor_tree, anchors_dict, achor_lb, config.sub_radius)
+                # Check if anchors have already been computed
+                if exists(anchors_file):
+                    print('Found anchors for cloud {:s}, subsampled at {:.3f}'.format(self.cloud_names[i], self.config.first_subsampling_dl))
+                    
+                    # Read pkl to get anchors
+                    with open(anchors_file, 'rb') as f:
+                        anchor, anchor_tree, anchors_dict, anchor_lb = pickle.load(f)
+                else:
+                    # Create anchors
+                    points = np.array(tree.data)
+                    anchor = get_anchors(points, config.sub_radius, method=config.anchor_method)
+                    anchor, anchor_tree, anchors_dict, anchor_lb = anchors_with_points(
+                        tree, anchor, self.input_labels[i], config.sub_radius, config.num_classes)
 
+                    # Update subregion information according to overlaps
+                    anchor, anchor_tree, anchors_dict, anchor_lb = update_anchors(
+                        tree, anchor, anchor_tree, anchors_dict, anchor_lb, config.sub_radius)
+
+                    # Save anchors as pickle file
+                    with open(anchors_file, 'wb') as f:
+                        pickle.dump([anchor, anchor_tree, anchors_dict, anchor_lb], f)
+
+                # Save anchors of all files in single variables
                 self.anchors += [anchor]
                 self.anchor_dicts += [anchors_dict]
                 self.anchor_trees += [anchor_tree]
-                self.anchor_lbs += [achor_lb]
+                self.anchor_lbs += [anchor_lb]
 
         # Initialize potentials
         if use_potentials:
@@ -658,9 +674,9 @@ class DALESWLDataset(PointCloudDataset):
         dl = self.config.first_subsampling_dl
 
         # Create path for files
-        tree_path = join(self.path, 'input_{:.3f}'.format(dl))
-        if not exists(tree_path):
-            makedirs(tree_path)
+        self.tree_path = join(self.path, 'input_{:.3f}'.format(dl))
+        if not exists(self.tree_path):
+            makedirs(self.tree_path)
 
         ##############
         # Load KDTrees
@@ -675,8 +691,8 @@ class DALESWLDataset(PointCloudDataset):
             cloud_name = self.cloud_names[i]
 
             # Name of the input files
-            KDTree_file = join(tree_path, '{:s}_KDTree.pkl'.format(cloud_name))
-            sub_ply_file = join(tree_path, '{:s}.ply'.format(cloud_name))
+            KDTree_file = join(self.tree_path, '{:s}_KDTree.pkl'.format(cloud_name))
+            sub_ply_file = join(self.tree_path, '{:s}.ply'.format(cloud_name))
 
             # Check if inputs have already been computed
             if exists(KDTree_file):
@@ -747,7 +763,7 @@ class DALESWLDataset(PointCloudDataset):
                 cloud_name = self.cloud_names[i]
 
                 # Name of the input files
-                coarse_KDTree_file = join(tree_path, '{:s}_coarse_KDTree.pkl'.format(cloud_name))
+                coarse_KDTree_file = join(self.tree_path, '{:s}_coarse_KDTree.pkl'.format(cloud_name))
 
                 # Check if inputs have already been computed
                 if exists(coarse_KDTree_file):
@@ -796,7 +812,7 @@ class DALESWLDataset(PointCloudDataset):
                 cloud_name = self.cloud_names[i]
 
                 # File name for saving
-                proj_file = join(tree_path, '{:s}_proj.pkl'.format(cloud_name))
+                proj_file = join(self.tree_path, '{:s}_proj.pkl'.format(cloud_name))
 
                 # Try to load previous indices
                 if exists(proj_file):

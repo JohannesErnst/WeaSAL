@@ -30,45 +30,38 @@ from utils.anchors import *
 #
 
 
-def get_weak_labels_per_point(cloud_name, sub_folder, sub_radius, num_classes, anchor_method):
+def get_weak_labels_per_point(cloud_name, sub_folder, num_classes):
     """
-    Create point-wise weak labels for the given input cloud. 
+    Get point-wise weak labels for the given input cloud. 
     Uses subcloud labels and overlap region labels as weak labels.
 
     :param cloud_name: Input cloud to create the weak labels for
     :param sub_folder: Folder to subsampled data
-    :param sub_radius: Radius of the subclouds
     :param num_classes: Number of classes for dataset
-    :param anchor_method: Method for placing the anchors/subclouds
     :return: weak_labels
     """
 
     # Name of the input files
     KDTree_file = join(sub_folder, '{:s}_KDTree.pkl'.format(cloud_name))
-    sub_ply_file = join(sub_folder, '{:s}.ply'.format(cloud_name))
+    anchors_file = join(sub_folder, '{:s}_anchors.pkl'.format(cloud_name))
 
     # Get data and read pkl with search tree
     if not exists(KDTree_file):
         raise ValueError('KDTree file does not exist: {:s}'.format(KDTree_file))
-    data = read_ply(sub_ply_file)
-    sub_labels = data['class']
     with open(KDTree_file, 'rb') as f:
         search_tree = pickle.load(f)
+        num_points = search_tree.data.shape[0]
 
     # Define the same anchors (i.e. subregions of point cloud) as when training/testing
-    points = np.array(search_tree.data)
-    anchor = get_anchors(points, sub_radius, method=anchor_method)
-    anchor, anchor_tree, anchor_dict, anchor_lb = anchors_with_points(
-        search_tree, anchor, sub_labels, sub_radius, num_classes)
-
-    # Update subregion information according to overlaps
-    anchor, anchor_tree, anchor_dict, anchor_lb = update_anchors(
-        search_tree, anchor, anchor_tree, anchor_dict, anchor_lb, sub_radius)
+    if not exists(anchors_file):
+        raise ValueError('Anchors file does not exist: {:s}'.format(anchors_file))
+    with open(anchors_file, 'rb') as f:
+        anchor, anchor_tree, anchors_dict, anchor_lb = pickle.load(f)
 
     # Create point-wise weak (subcloud) labels
-    weak_labels = np.ones((points.shape[0], num_classes))
-    for aa in anchor_dict.keys():
-        idx = anchor_dict[aa][0]
+    weak_labels = np.ones((num_points, num_classes))
+    for aa in anchors_dict.keys():
+        idx = anchors_dict[aa][0]
         lbs = anchor_lb[aa]
         slc_lb = weak_labels[tuple(idx)]
         weak_labels[tuple(idx)] = slc_lb*lbs
@@ -129,9 +122,8 @@ for file in refinement_list:
     probs = np.vstack([data[label] for label in label_list]).T
 
     # Refine probabilities with ground truth weak labels of subsampled cloud
-    print('Creating point-wise weak labels for "' + file_name + '":')
-    weak_labels = get_weak_labels_per_point(
-        file_name, sub_folder, config.sub_radius, config.num_classes, config.anchor_method)
+    print('Getting point-wise weak labels for "' + file_name + '"')
+    weak_labels = get_weak_labels_per_point(file_name, sub_folder, config.num_classes)
     probs = probs[indices]
     probs = probs*weak_labels
 
