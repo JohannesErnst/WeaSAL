@@ -404,11 +404,6 @@ class Config:
             
             if hasattr(self, 'sub_radius'):
                 text_file.write('sub_radius = {:.6f}\n'.format(self.sub_radius))
-            if hasattr(self, 'xyz_offset'):
-                text_file.write('xyz_offset =')
-                for a in self.xyz_offset:
-                    text_file.write(' {:.6f}'.format(a))
-            text_file.write('\n')
             if hasattr(self, 'model_name'):         
                 text_file.write('model_name = {:s}\n'.format(self.model_name))
             if hasattr(self, 'loss_type'):

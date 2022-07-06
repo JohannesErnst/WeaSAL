@@ -326,8 +326,9 @@ class ModelTesterPL:
                     valid_label_list = np.delete(test_loader.dataset.label_values,remove_labels).tolist()
                     for i, file_path in enumerate(test_loader.dataset.files):
 
-                        # Get file
+                        # Get points from file and add coordinate offset
                         points = test_loader.dataset.load_evaluation_points(file_path)
+                        points = points + test_loader.dataset.coord_offset
 
                         # Get the predicted labels
                         preds = test_loader.dataset.label_values[np.argmax(proj_probs[i], axis=1)].astype(np.int32)

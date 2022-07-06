@@ -192,8 +192,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
                 print('Preparing anchors and weak labels (' +
                       str(i+1) + '/' + str(len(self.input_trees)) + ')')
                 points = np.array(tree.data)
-                anchor = get_anchors(
-                    points, config.sub_radius, xyz_offset=config.xyz_offset, method=config.anchor_method)
+                anchor = get_anchors(points, config.sub_radius, method=config.anchor_method)
                 anchor, anchor_tree, anchors_dict, achor_lb = anchors_with_points(
                     tree, anchor, self.input_labels[i], config.sub_radius, config.num_classes)
 
@@ -582,7 +581,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 
         # Fixed value for reducing the coordinates (numeric stability)
         data = read_ply(join(self.path, self.cloud_names[0] + '.ply'))
-        offset = np.vstack((data['x'][0], data['y'][0], data['z'][0])).T
+        self.coord_offset = np.vstack((data['x'][0], data['y'][0], data['z'][0])).T
 
         # Assign training/validation and test cloud names
         if self.set == 'test':
@@ -609,7 +608,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             points = np.vstack((data['x'], data['y'], data['z'])).T
 
             # Reduce coordinates by fixed offset and convert to float32
-            cloud_points = (points - offset).astype(np.float32)
+            cloud_points = (points - self.coord_offset).astype(np.float32)
 
             # Define "color" as intensity
             cloud_colors = (data['scalar_Intensity'].T).astype(np.uint8)

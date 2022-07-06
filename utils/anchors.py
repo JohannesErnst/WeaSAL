@@ -22,7 +22,7 @@ import numpy as np
 from utils.mayavi_visu import *
 
 
-def get_anchors(points, sub_radius, xyz_offset=[0,0,0], method='full'):
+def get_anchors(points, sub_radius, method='full'):
     """
     Return anchor points (n_anchors) for specified pointcloud
     """
@@ -42,9 +42,9 @@ def get_anchors(points, sub_radius, xyz_offset=[0,0,0], method='full'):
         x_step = np.floor((x_max - x_min) / sub_radius) + 1
         y_step = np.floor((y_max - y_min) / sub_radius) + 1
         z_step = np.floor((z_max - z_min) / sub_radius) + 1  
-        x_num = np.linspace(x_min, x_max, x_step.astype('int'))+xyz_offset[0]
-        y_num = np.linspace(y_min, y_max, y_step.astype('int'))+xyz_offset[1]
-        z_num = np.linspace(z_min, z_max, z_step.astype('int'))+xyz_offset[2]
+        x_num = np.linspace(x_min, x_max, x_step.astype('int'))
+        y_num = np.linspace(y_min, y_max, y_step.astype('int'))
+        z_num = np.linspace(z_min, z_max, z_step.astype('int'))
         for x in x_num:
             for y in y_num:
                 for z in z_num:
@@ -55,9 +55,9 @@ def get_anchors(points, sub_radius, xyz_offset=[0,0,0], method='full'):
         x_step = np.floor((x_max - x_min) / (2*sub_radius)) + 1
         y_step = np.floor((y_max - y_min) / (2*sub_radius)) + 1
         z_step = np.floor((z_max - z_min) / (2*sub_radius)) + 1  
-        x_num = np.linspace(x_min, x_max, x_step.astype('int'))+xyz_offset[0]
-        y_num = np.linspace(y_min, y_max, y_step.astype('int'))+xyz_offset[1]
-        z_num = np.linspace(z_min, z_max, z_step.astype('int'))+xyz_offset[2]
+        x_num = np.linspace(x_min, x_max, x_step.astype('int'))
+        y_num = np.linspace(y_min, y_max, y_step.astype('int'))
+        z_num = np.linspace(z_min, z_max, z_step.astype('int'))
         for x in x_num:
             for y in y_num:
                 for z in z_num:

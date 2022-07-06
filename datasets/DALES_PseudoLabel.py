@@ -674,7 +674,7 @@ class DALESPLDataset(PointCloudDataset):
 
         # Fixed value for reducing the coordinates (numeric stability)
         data = read_ply(join(self.path, self.cloud_names[0] + '.ply'))
-        offset = np.vstack((data['x'][0], data['y'][0], data['z'][0])).T
+        self.coord_offset = np.vstack((data['x'][0], data['y'][0], data['z'][0])).T
 
         # Assign validation and test cloud names
         # Note: Train clouds are skipped here because they are already processed
@@ -704,7 +704,7 @@ class DALESPLDataset(PointCloudDataset):
             points = np.vstack((data['x'], data['y'], data['z'])).T
 
             # Reduce coordinates by fixed offset and convert to float32
-            cloud_points = (points - offset).astype(np.float32)
+            cloud_points = (points - self.coord_offset).astype(np.float32)
 
             # Get point classes
             cloud_classes = (np.vstack(data['scalar_Classification'])).astype(np.int32)
