@@ -147,7 +147,7 @@ class Vaihingen3DPLConfig(Config):
     grad_clip_norm = 100.0
 
     # Number of batch (decrease to reduce memory cost, but it should remain > 3 for stability)
-    batch_num = 4
+    batch_num = 5
 
     # Number of steps per epochs
     epoch_steps = 200
@@ -163,8 +163,9 @@ class Vaihingen3DPLConfig(Config):
     augment_symmetries = [True, True, True]     # describes symmetry of scale factor in x, y and z
     augment_rotation = 'vertical'
     augment_scale_min = 0.2
-    augment_scale_max = 1.9
+    augment_scale_max = 1.8
     augment_noise = 0.06
+    augment_color = 0.7
 
     # Enable dropout
     dropout = 0.5
@@ -175,7 +176,7 @@ class Vaihingen3DPLConfig(Config):
 
     # Choose model name and pseudo label log
     model_name = 'KPFCNN'
-    weak_label_log = 'Log_2022-07-01_14-17-59'
+    weak_label_log = 'Log_2022-07-06_14-08-24'
 
     # Choose weights for class
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]

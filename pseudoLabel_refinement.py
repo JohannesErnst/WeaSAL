@@ -76,7 +76,7 @@ def get_weak_labels_per_point(cloud_name, sub_folder, num_classes):
 
 
 # Define weak label log for pseudo label refinement (from test/WeakLabel)
-weak_label_log = 'Log_2022-07-01_14-17-59'
+weak_label_log = 'Log_2022-07-06_14-08-24'
 
 # Define threshold (in percent) for ignoring uncertain labels
 threshold = 20
@@ -104,6 +104,9 @@ for file in refinement_list:
     points = np.array([data['x'], data['y'], data['z']]).T
     pseudo_lbs = data['preds']
     file_name = file.split('/')[-1].split('.ply')[0]
+
+    # Reduce coordinates for numeric stability and convert to float32
+    points = (points - points[0]).astype(np.float32)
 
     # Read the data from the original file
     file_orig = join(sub_folder, file_name + '.ply')
