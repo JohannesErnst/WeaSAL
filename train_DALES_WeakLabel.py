@@ -138,8 +138,8 @@ class DALESWLConfig(Config):
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
     momentum = 0.98
-    lr_decays = {i: 0.1 ** (1 / 150) for i in range(1, max_epoch)}
-    grad_clip_norm = 100.0
+    lr_decays = {i: 0.98 for i in range(1, 1000)}
+    grad_clip_norm = 1
 
     # Number of batch (or number of input spheres)
     batch_num = 4
@@ -168,7 +168,7 @@ class DALESWLConfig(Config):
     dropout = 0
 
     # Other parameters
-    model_name = 'KPFCNN_mprm_ele'
+    model_name = 'KPFCNN_mprm'
     loss_type = 'region_mprm_loss'
     xyz_offset = [0, 0, 0]
     anchor_method = 'reduced'
@@ -276,10 +276,7 @@ if __name__ == '__main__':
 
     # Define network model
     t1 = time.time()
-    if config.model_name == 'KPFCNN_mprm':
-        net = KPFCNN_mprm(config, training_dataset.label_values, training_dataset.ignored_labels)
-    elif config.model_name == 'KPFCNN_mprm_ele':
-        net = KPFCNN_mprm_ele(config, training_dataset.label_values, training_dataset.ignored_labels) 
+    net = KPFCNN_mprm(config, training_dataset.label_values, training_dataset.ignored_labels)
    
     debug = False
     if debug:

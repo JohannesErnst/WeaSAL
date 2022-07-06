@@ -505,7 +505,8 @@ class KPFCNN(nn.Module):
 
 class KPFCNN_mprm(nn.Module):
     """
-    Class defining KPFCNN for weak labels with multi-path region mining (mprm)
+    Class defining KPFCNN for weak labels with multi-path region mining (mprm) 
+    and elevation attention module.
     """
 
     def __init__(self, config, lbl_values, ign_lbls):
@@ -575,11 +576,11 @@ class KPFCNN_mprm(nn.Module):
                 out_dim *= 2
         
         self.multi_att = dual_att('attention', out_dim, out_dim, r, layer, config)
+        self.ele_head = ele_att('ele_attention', 2, out_dim, r, layer, config)
         self.no_ga = global_average_block('ga1', config.num_classes, config.num_classes, layer, config)
         self.da_ga = global_average_block('ga2', config.num_classes, config.num_classes, layer, config)
         self.spa_ga = global_average_block('ga3', config.num_classes, config.num_classes, layer, config)
-        self.cha_ga = global_average_block('ga4', config.num_classes, config.num_classes, layer, config)
-        
+        self.cha_ga = global_average_block('ga4', config.num_classes, config.num_classes, layer, config)     
 
         #####################
         # List Decoder blocks
@@ -666,12 +667,16 @@ class KPFCNN_mprm(nn.Module):
         # Get input features
         x = batch.features.clone().detach()
 
+        # Include elevation attention
+        ele_down = batch.points[2][:,-1].unsqueeze_(-1).clone().detach()
+
         # Loop over consecutive encoder blocks
         skip_x = []
         for block_i, block_op in enumerate(self.encoder_blocks):
             if block_i in self.encoder_skips:
                 skip_x.append(x)
             x = block_op(x, batch)
+        x = self.ele_head(x, ele_down, batch)
             
         # Combine attention modules and save logits
         spa_att, cha_att, no_att, dual_att = self.multi_att(x, batch)
@@ -792,187 +797,3 @@ class KPFCNN_mprm(nn.Module):
         correct = (predicted == target).sum().item()
 
         return correct / total
-
-
-class KPFCNN_mprm_ele(KPFCNN_mprm):        
-    """
-    Class defining KPFCNN for weak labels (multi-path region mining) with elevation attention module
-    """
-
-    # Maybe I can just integrate this into the KPFCNN_mprm because I don't need the separation once it runs
-    # Maybe this was done by Lin to be able to compare MPRM vs the elevation attention approach -jer
-
-    def __init__(self, config, lbl_values, ign_lbls):
-        
-        KPFCNN_mprm.__init__(self, config, lbl_values, ign_lbls)
-
-        ############
-        # Parameters
-        ############
-
-        # Current radius of convolution and feature dimension
-        layer = 0
-        r = config.first_subsampling_dl * config.conv_radius
-        in_dim = config.in_features_dim
-        out_dim = config.first_features_dim
-        self.K = config.num_kernel_points
-        self.C = len(lbl_values) - len(ign_lbls)
-        self.features_layer = 'encoder_blocks.5.unary_shortcut.mlp'
-        self.forward_features = {}
-        self.backward_features = {}
-
-        #####################
-        # List Encoder blocks
-        #####################
-
-        # Save all block operations in a list of modules
-        self.encoder_blocks = nn.ModuleList()
-        self.encoder_skip_dims = []
-        self.encoder_skips = []
-
-        # Loop over consecutive blocks
-        for block_i, block in enumerate(config.architecture):
-
-            # Check equivariance
-            if ('equivariant' in block) and (not out_dim % 3 == 0):
-                raise ValueError('Equivariant block but features dimension is not a factor of 3')
-
-            # Detect change to next layer for skip connection
-            if np.any([tmp in block for tmp in ['pool', 'strided', 'upsample', 'global', 'attention']]):
-                self.encoder_skips.append(block_i)
-                self.encoder_skip_dims.append(in_dim)
-
-            # Detect upsampling block to stop
-            if 'attention' in block:
-                break            
-            if 'upsample' in block:
-                break
-                      
-            # Apply the good block function defining tf ops
-            self.encoder_blocks.append(block_decider(block,
-                                                    r,
-                                                    in_dim,
-                                                    out_dim,
-                                                    layer,
-                                                    config)) # r is radius
-
-            # Update dimension of input from output
-            if 'simple' in block:
-                in_dim = out_dim // 2
-            else:
-                in_dim = out_dim
-
-            # Detect change to a subsampled layer
-            if 'pool' in block or 'strided' in block:
-                # Update radius and feature dimension for next layer
-                layer += 1
-                r *= 2
-                out_dim *= 2
-
-        self.multi_att = dual_att('attention', out_dim, out_dim, r, layer, config)
-        self.ele_head = ele_att('ele_attention', 2, out_dim, r, layer, config)          # this is the important part, just to find it quickly later -jer
-        self.no_ga = global_average_block('ga1', config.num_classes, config.num_classes, layer, config)
-        self.da_ga = global_average_block('ga2', config.num_classes, config.num_classes, layer, config)
-        self.spa_ga = global_average_block('ga3', config.num_classes, config.num_classes, layer, config)
-        self.cha_ga = global_average_block('ga4', config.num_classes, config.num_classes, layer, config)
-        
-        #####################
-        # List Decoder blocks
-        #####################
-
-        # Save all block operations in a list of modules
-        self.decoder_blocks = nn.ModuleList()
-        self.decoder_concats = []
-
-        # Find first upsampling block
-        start_i = 0
-        for block_i, block in enumerate(config.architecture):
-            if 'upsample' in block:
-                start_i = block_i
-                break
-
-        # Loop over consecutive blocks
-        for block_i, block in enumerate(config.architecture[start_i:]):
-
-            # Add dimension of skip connection concat
-            if block_i > 0 and 'upsample' in config.architecture[start_i + block_i - 1]:
-                in_dim += self.encoder_skip_dims[layer]
-                self.decoder_concats.append(block_i)
-
-            # Apply the good block function defining tf ops
-            self.decoder_blocks.append(block_decider(block,
-                                                    r,
-                                                    in_dim,
-                                                    out_dim,
-                                                    layer,
-                                                    config))
-
-            # Update dimension of input from output
-            in_dim = out_dim
-
-            # Detect change to a subsampled layer
-            if 'upsample' in block:
-                # Update radius and feature dimension for next layer
-                layer -= 1
-                r *= 0.5
-                out_dim = out_dim // 2
-
-    def forward(self, batch, config):
-
-        # Get input features
-        x = batch.features.clone().detach()
-        
-        # Include elevation attention
-        ele_down = batch.points[2][:,-1].unsqueeze_(-1).clone().detach()
-
-        # Loop over consecutive encoder blocks
-        skip_x = []
-        for block_i, block_op in enumerate(self.encoder_blocks):
-            if block_i in self.encoder_skips:
-                skip_x.append(x)
-            x = block_op(x, batch)
-        x = self.ele_head(x, ele_down, batch)    
-        
-        # Combine attention modules and save logits
-        spa_att, cha_att, no_att, dual_att = self.multi_att(x, batch)
-            
-        no_att_cla = self.no_ga(no_att, batch)
-        dual_att_cla = self.da_ga(dual_att, batch)
-        spa_att_cla = self.spa_ga(spa_att, batch)
-        cha_att_cla = self.cha_ga(cha_att, batch)
-
-        cla_logits = [no_att_cla, dual_att_cla, spa_att_cla, cha_att_cla]
-               
-        # Loop over consecutive decoder blocks
-        for block_i, block_op in enumerate(self.decoder_blocks):
-            no_att = block_op(no_att, batch)
-            dual_att = block_op(dual_att, batch)
-            spa_att = block_op(spa_att, batch)
-            cha_att = block_op(cha_att, batch)
-            
-        # Element-wise maximum to get pseudo labels
-        x = torch.max(no_att, dual_att)
-        x = torch.max(x, spa_att)
-        x = torch.max(x, cha_att)
-        
-        cam = [no_att, dual_att, spa_att, cha_att]
-
-        return x, cla_logits, cam        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

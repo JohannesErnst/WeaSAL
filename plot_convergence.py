@@ -736,7 +736,7 @@ def experiment_name_1():
 
     # Using the dates of the logs, you can easily gather consecutive ones. All logs should be of the same dataset.
     start = 'Log_2022-07-01_14-17-59'
-    end = 'Log_2022-07-01_14-17-59'
+    end = 'Log_2022-07-05_14-21-07'
 
     # Name of the result path (either WeakLabel or PseudoLabel)
     res_path = 'results/WeakLabel'
@@ -747,7 +747,9 @@ def experiment_name_1():
 
     # Give names to the logs (for plot legends)
     logs_names = ['V3D WL baseline',
-                  '']
+                  'no ele',
+                  'high augment',
+                  'low augment']
 
     # safe check log names
     logs_names = np.array(logs_names[:len(logs)])

@@ -142,7 +142,7 @@ class Vaihingen3DWLConfig(Config):
     grad_clip_norm = 1
 
     # Number of batch (or number of input spheres)
-    batch_num = 3
+    batch_num = 4
 
     # Number of steps per epochs
     epoch_steps = 600
@@ -168,7 +168,7 @@ class Vaihingen3DWLConfig(Config):
     dropout = 0.5
 
     # Other parameters
-    model_name = 'KPFCNN_mprm_ele'
+    model_name = 'KPFCNN_mprm'
     loss_type = 'region_mprm_loss'
     xyz_offset = [0, 0, 0]
     anchor_method = 'reduced'
@@ -276,10 +276,7 @@ if __name__ == '__main__':
 
     # Define network model
     t1 = time.time()
-    if config.model_name == 'KPFCNN_mprm':
-        net = KPFCNN_mprm(config, training_dataset.label_values, training_dataset.ignored_labels)
-    elif config.model_name == 'KPFCNN_mprm_ele':
-        net = KPFCNN_mprm_ele(config, training_dataset.label_values, training_dataset.ignored_labels) 
+    net = KPFCNN_mprm(config, training_dataset.label_values, training_dataset.ignored_labels)
    
     debug = False
     if debug:

@@ -99,16 +99,17 @@ if __name__ == '__main__':
     #       > 'results/XLabel/Log_YYYY-MM-DD_HH-MM-SS': Directly provide the path of a trained model
 
     chosen_log = 'results/WeakLabel/Log_2022-06-28_08-27-45'
-    chosen_log = 'last_Vaihingen3DPL'
+    chosen_log = 'last_Vaihingen3DWL'
 
     # Choose the index of the checkpoint to load OR None if you want to load the current checkpoint
     chkp_idx = -1
 
     # Choose to test on validation or test split
-    on_val = False
+    on_val = True
 
     # Deal with 'last_XXXXXX' choices
     chosen_log = model_choice(chosen_log)
+    print('\nTesting on ' + chosen_log)
 
     ############################
     # Initialize the environment
@@ -205,9 +206,6 @@ if __name__ == '__main__':
     if config.model_name == 'KPFCNN_mprm':
         net = KPFCNN_mprm(config, test_dataset.label_values, test_dataset.ignored_labels)
         tester = ModelTesterWL(net, chkp_path=chosen_chkp)
-    elif config.model_name == 'KPFCNN_mprm_ele':
-        net = KPFCNN_mprm_ele(config, test_dataset.label_values, test_dataset.ignored_labels)
-        tester = ModelTesterWL(net, chkp_path=chosen_chkp) 
     elif config.model_name == 'KPFCNN':
         net = KPFCNN(config, test_dataset.label_values, test_dataset.ignored_labels) 
         tester = ModelTesterPL(net, chkp_path=chosen_chkp)
