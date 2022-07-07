@@ -167,8 +167,14 @@ def load_snap_clouds(path, dataset, only_last=False):
     epoch_order = np.argsort(cloud_epochs)
     cloud_epochs = cloud_epochs[epoch_order]
     cloud_folders = cloud_folders[epoch_order]
-
+    
+    # Remove ignored labels from confusions
     Confs = np.zeros((len(cloud_epochs), dataset.num_classes, dataset.num_classes), dtype=np.int32)
+    for l_ind, label_value in reversed(list(enumerate(dataset.label_values))):
+        if label_value in dataset.ignored_labels:
+            Confs = np.delete(Confs, l_ind, axis=1)
+            Confs = np.delete(Confs, l_ind, axis=2)
+
     for c_i, cloud_folder in enumerate(cloud_folders):
         if only_last and c_i < len(cloud_epochs) - 1:
             continue
@@ -193,12 +199,6 @@ def load_snap_clouds(path, dataset, only_last=False):
             for f in listdir_str(cloud_folder):
                 if f.endswith('.ply'):
                     remove(join(cloud_folder, f))
-
-    # Remove ignored labels from confusions
-    for l_ind, label_value in reversed(list(enumerate(dataset.label_values))):
-        if label_value in dataset.ignored_labels:
-            Confs = np.delete(Confs, l_ind, axis=1)
-            Confs = np.delete(Confs, l_ind, axis=2)
 
     return cloud_epochs, IoU_from_confusions(Confs)
 
@@ -735,12 +735,12 @@ def experiment_name_1():
     """
 
     # Using the dates of the logs, you can easily gather consecutive ones. All logs should be of the same dataset.
-    start = 'Log_2022-07-01_14-17-59'
-    end = 'Log_2022-07-05_14-21-07'
+    start = 'Log_2022-07-03_09-56-52'
+    end = 'Log_2022-07-06_21-39-57'
 
     # Name of the result path (either WeakLabel or PseudoLabel)
-    res_path = 'results/WeakLabel'
-    # res_path = 'results/PseudoLabel'
+    # res_path = 'results/WeakLabel'
+    res_path = 'results/PseudoLabel'
 
     # Gather logs and sort by date
     logs = np.sort([join(res_path, l) for l in listdir_str(res_path) if start <= l <= end])

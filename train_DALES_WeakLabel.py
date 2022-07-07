@@ -142,16 +142,16 @@ class DALESWLConfig(Config):
     grad_clip_norm = 1
 
     # Number of batch (or number of input spheres)
-    batch_num = 4
+    batch_num = 3
 
     # Number of steps per epochs
-    epoch_steps = 250
+    epoch_steps = 400
 
     # Number of validation examples per epoch
     validation_size = 50
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 50
+    checkpoint_gap = 20
 
     # Augmentations
     augment_scale_anisotropic = True
@@ -159,13 +159,13 @@ class DALESWLConfig(Config):
     augment_rotation = 'vertical'
     augment_scale_min = 0.9
     augment_scale_max = 1.1
-    augment_noise = 0.01
+    augment_noise = 0.02
 
     # Choose weights for class
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 
     # Enable dropout
-    dropout = 0
+    dropout = 0.5
 
     # Other parameters
     model_name = 'KPFCNN_mprm'
