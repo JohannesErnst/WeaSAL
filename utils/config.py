@@ -265,7 +265,7 @@ class Config:
                     self.class_w = [float(w) for w in line_info[2:]]
 
                 elif line_info[0] == 'dropout':
-                    setattr(self, line_info[0], line_info[2]) 
+                    setattr(self, line_info[0], float(line_info[2])) 
                 
                 elif line_info[0] == 'model_name':
                     setattr(self, line_info[0], line_info[2])
@@ -411,7 +411,7 @@ class Config:
             if hasattr(self, 'contrast_start'):
                 text_file.write('contrast_start = {:.6f}\n'.format(self.contrast_start))
             if hasattr(self, 'contrast_thd'):
-                text_file.write('contrast_thd [%] = {:.6f}\n'.format(self.contrast_thd))
+                text_file.write('contrast_thd[%] = {:.6f}\n'.format(self.contrast_thd))
             if hasattr(self, 'anchor_method'):
                 text_file.write('anchor_method = {:s}\n'.format(self.anchor_method))                   
             if hasattr(self, 'weak_label_log'):

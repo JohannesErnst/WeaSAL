@@ -451,7 +451,7 @@ class DALESPLDataset(PointCloudDataset):
         if self.config.in_features_dim == 1:
             pass
         elif self.config.in_features_dim == 3:
-            stacked_features = np.hstack((stacked_features, features[:, :2]))       # check if correct -jer
+            stacked_features = np.hstack((stacked_features, features[:, :2]))
         else:
             raise ValueError('Only accepted input dimensions are 1 and 3')
 
@@ -637,7 +637,7 @@ class DALESPLDataset(PointCloudDataset):
         if self.config.in_features_dim == 1:
             pass
         elif self.config.in_features_dim == 3:
-            stacked_features = np.hstack((stacked_features, features[:, :2]))       # check if correct -jer
+            stacked_features = np.hstack((stacked_features, features[:, :2]))
         else:
             raise ValueError('Only accepted input dimensions are 1 and 3')
 
@@ -681,9 +681,9 @@ class DALESPLDataset(PointCloudDataset):
         if self.set == 'training':
             return
         elif self.set == 'test':        
-            cloud_names_sort = [self.cloud_names[self.test_split]]
+            cloud_names_sort = [self.cloud_names[i] for i in self.test_split]
         elif self.set == 'validation':          # test this -jer
-            cloud_names_sort = [self.cloud_names[self.validation_split]]
+            cloud_names_sort = [self.cloud_names[i] for i in self.validation_split]
 
         # Prepare all clouds
         print('\nPreparing ply files')

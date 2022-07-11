@@ -379,7 +379,6 @@ class ModelTesterWL:
                         # Add up confusions for final confusion matrix
                         labels = test_loader.dataset.validation_labels[i].astype(np.int32)
                         Confs += fast_confusion(labels, preds, test_loader.dataset.label_values).astype(np.int32)
-                        # If there is an error here it is due to the size of Confs. In lin et al they use one size bigger for DALES. Not sure why though -jer
 
                         # Save ascii preds
                         # ascii_name = join(test_path, 'predictions', cloud_name[:-4] + '.txt')

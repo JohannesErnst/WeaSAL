@@ -467,7 +467,7 @@ class ModelTrainer:
                 if not exists(pot_path):
                     makedirs(pot_path)
                 files = val_loader.dataset.files
-                for i, file_path in enumerate(files):       # this part is deleted in lin et al. Delte as well? -jer
+                for i, file_path in enumerate(files):
                     pot_points = np.array(val_loader.dataset.pot_trees[i].data, copy=False)
                     cloud_name = file_path.split('/')[-1]
                     pot_name = join(pot_path, cloud_name)

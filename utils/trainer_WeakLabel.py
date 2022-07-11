@@ -512,7 +512,6 @@ class ModelTrainer:
                 # Add up confusions
                 labels = val_loader.dataset.validation_labels[i].astype(np.int32)
                 Confs += fast_confusion(labels, preds, val_loader.dataset.label_values).astype(np.int32)
-                # If there is an error here it is due to the size of Confs. In lin et al they use one size bigger for DALES. Not sure why though -jer
 
             # Save confusions
             c_path = join(val_path, 'conf.txt')

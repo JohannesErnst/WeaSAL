@@ -423,7 +423,7 @@ class KPFCNN(nn.Module):
             N = outputs.shape[0]
             eps = 1e-8
             tensor_0 = torch.tensor(0).float().cuda()
-            threshold = config.contrast_thd / 100
+            threshold = config.contrast_thd / 100           # test this. Maybe the pseudo_logits have much higher probs here -jer
             
             # Get probabilities
             prob = torch.nn.Softmax(1)(outputs) 

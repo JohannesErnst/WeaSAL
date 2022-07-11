@@ -138,20 +138,12 @@ class Vaihingen3DPLConfig(Config):
     #####################
 
     # Maximal number of epochs
-    max_epoch = 300
+    max_epoch = 100
 
     # Learning rate management (standard value is 1e-2)
-    # learning_rate = 0.01
-    # momentum = 0.98
-    # lr_decays = {i: 0.1 ** (1 / 150) for i in range(1, max_epoch)}
-    learning_rate = 0.001 
+    learning_rate = 0.01
     momentum = 0.98
-    lr_decays = {}
-    for i in range(1,100):
-        if i%5==0 and i<101:        
-            lr_decays[i]=0.7 
-        else:
-            lr_decays[i]=1 
+    lr_decays = {i: 0.1 ** (1 / 150) for i in range(1, max_epoch)}
     grad_clip_norm = 100.0
 
     # Number of batch (decrease to reduce memory cost, but it should remain > 3 for stability)
@@ -164,21 +156,15 @@ class Vaihingen3DPLConfig(Config):
     validation_size = 200
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 50
+    checkpoint_gap = 20
 
     # Augmentations
-    # augment_scale_anisotropic = True
-    # augment_symmetries = [True, True, True]     # describes symmetry of scale factor in x, y and z
-    # augment_rotation = 'vertical'
-    # augment_scale_min = 0.2
-    # augment_scale_max = 1.8
-    # augment_noise = 0.06
     augment_scale_anisotropic = True
-    augment_symmetries = [True, True, False]
+    augment_symmetries = [True, True, True]     # describes symmetry of scale factor in x, y and z
     augment_rotation = 'vertical'
-    augment_scale_min = 0.8
-    augment_scale_max = 1.2
-    augment_noise = 0.001
+    augment_scale_min = 0.2
+    augment_scale_max = 1.8
+    augment_noise = 0.06
     augment_color = 0.7
 
     # Enable dropout

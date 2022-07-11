@@ -70,7 +70,6 @@ def get_anchors(points, sub_radius, method='full'):
     return np.array(n_anchors)
 
 def anchors_with_points(input_tree, anchors, lbs, radius, n_class):
-    # This was once named anchors_part_lbs. Just fyi when trying to find the function -jer
     """
     Return anchors (i.e. subregions) that have points inside
     """

@@ -76,10 +76,11 @@ def get_weak_labels_per_point(cloud_name, sub_folder, num_classes):
 
 
 # Define weak label log for pseudo label refinement (from test/WeakLabel)
-weak_label_log = 'Log_2022-07-06_14-08-24'
+weak_label_log = 'Log_2022-07-07_10-41-04'
 
 # Define threshold (in percent) for ignoring uncertain labels
-threshold = 20
+# !! THIS HAS TO BE ADAPTED FOR DALES !! -jer
+threshold = 2
 
 # Load configuration
 config_path = join('results/WeakLabel', weak_label_log)
@@ -95,7 +96,7 @@ refinement_list = [join(base_path, 'predictions', f)
                    for f in listdir(training_files) if isfile(join(training_files, f))]
 
 # Loop over list of files for refinement
-print('Pseudo label refinement for ' + weak_label_log + ' with threshold ' + str(threshold) + '%:\n')
+print('\nPseudo label refinement for ' + weak_label_log + ' with threshold ' + str(threshold) + '%:\n')
 counts = np.zeros(config.num_classes, np.int64)
 for file in refinement_list:
 
@@ -106,12 +107,15 @@ for file in refinement_list:
     file_name = file.split('/')[-1].split('.ply')[0]
 
     # Reduce coordinates for numeric stability and convert to float32
-    points = (points - points[0]).astype(np.float32)
+    points = (points - np.min(points[:,:], 0)).astype(np.float32)
 
     # Read the data from the original file
     file_orig = join(sub_folder, file_name + '.ply')
     data_orig = read_ply(file_orig)
     points_orig = np.array([data_orig['x'], data_orig['y'], data_orig['z']]).T
+
+    # Reduce original coordinates to match the offset with the prediction cloud
+    points_orig = (points_orig - np.min(points_orig[:,:], 0)).astype(np.float32)
 
     # Get point neighbours and indices of points in original cloud
     nbrs = NearestNeighbors(n_neighbors=1, algorithm='kd_tree').fit(points[:, :3])
