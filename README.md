@@ -1,7 +1,9 @@
 # Weakly Supervised Active Learning
 Combination of Weakly Supervised Learning and Active Learning for 3D Point Cloud Classification with Minimum Labeling Effort.
 
-![Overview](https://user-images.githubusercontent.com/51992212/178697796-4d9249c8-599e-4803-9ec8-cb0ae0f163e2.png)
+<p align="center">
+  <src="[http://www.fillmurray.com/460/300](https://user-images.githubusercontent.com/51992212/178697796-4d9249c8-599e-4803-9ec8-cb0ae0f163e2.png)">
+</p>
 
 Credit: Lin, Y., G. Vosselman, and M. Y. Yang (2022). "Weakly supervised semantic segmentation of airborne laser scanning point clouds", Figure 1
 
