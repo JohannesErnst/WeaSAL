@@ -138,19 +138,27 @@ class DALESPLConfig(Config):
     #####################
 
     # Maximal number of epochs
-    max_epoch = 600
+    max_epoch = 200
 
     # Learning rate management (standard value is 1e-2)
-    learning_rate = 0.01
+    # learning_rate = 0.01
+    # momentum = 0.98
+    # lr_decays = {i: 0.1 ** (1 / 150) for i in range(1, max_epoch)}
+    learning_rate = 0.001
     momentum = 0.98
-    lr_decays = {i: 0.1 ** (1 / 150) for i in range(1, max_epoch)}
+    lr_decays = {}
+    for i in range(1, 100):
+        if i % 5 == 0 and i < 101:
+            lr_decays[i] = 0.7
+        else:
+            lr_decays[i] = 1
     grad_clip_norm = 100.0
 
     # Number of batch (decrease to reduce memory cost, but it should remain > 3 for stability)
     batch_num = 4
 
     # Number of steps per epochs
-    epoch_steps = 750
+    epoch_steps = 100
 
     # Number of validation examples per epoch
     validation_size = 50
@@ -165,17 +173,18 @@ class DALESPLConfig(Config):
     augment_scale_min = 0.9
     augment_scale_max = 1.1
     augment_noise = 0.01
+    augment_color = 0.7
 
     # Enable dropout
     dropout = 0
 
     # Parameters for supervised contrastive loss (start and threshold [%])
     contrast_start = 0
-    contrast_thd = 20
+    contrast_thd = 2
 
     # Choose model name and pseudo label log
     model_name = 'KPFCNN'
-    weak_label_log = 'Log_2022-07-01_14-17-59'
+    weak_label_log = 'Log_2022-07-07_10-41-04'
 
     # Choose weights for class
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]

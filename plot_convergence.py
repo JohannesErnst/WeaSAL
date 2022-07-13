@@ -735,12 +735,12 @@ def experiment_name_1():
     """
 
     # Using the dates of the logs, you can easily gather consecutive ones. All logs should be of the same dataset.
-    start = 'Log_2022-07-07_10-41-04'
-    end = 'Log_2022-07-07_10-41-04'
+    start = 'Log_2022-07-12_10-44-42'
+    end = 'Log_2022-07-12_10-44-42'
 
     # Name of the result path (either WeakLabel or PseudoLabel)
-    res_path = 'results/WeakLabel'
-    # res_path = 'results/PseudoLabel'
+    # res_path = 'results/WeakLabel'
+    res_path = 'results/PseudoLabel'
 
     # Gather logs and sort by date
     logs = np.sort([join(res_path, l) for l in listdir_str(res_path) if start <= l <= end])

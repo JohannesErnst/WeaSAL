@@ -136,6 +136,8 @@ for file in refinement_list:
 
     # Select only confident (i.e. with high probability) predictions
     # and assign "no-label" (here: 10) to the rest of the points
+    # WARNING: In the following code (pseudo label training), the use of
+    # "10" as "no-label" is hard-coded! Changes might lead to errors
     empty = np.max(probs, axis=-1) < (0.01*threshold)
     pseudo_lbs = pseudo_lbs[indices]
     pseudo_lbs[empty] = 10
@@ -165,4 +167,4 @@ weights = np.log(1/(counts/np.sum(counts)))
 weights_norm = weights/np.sum(weights)
 weights_path = join(out_folder, config.dataset[:-2]+'_t'+str(threshold)+'_weight.txt')
 np.savetxt(weights_path, weights_norm, fmt='%.3f')
-print('Created: ' + weights_path + '\n')
+print('\nCreated: ' + weights_path + '\n')

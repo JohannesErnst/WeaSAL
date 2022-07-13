@@ -245,6 +245,10 @@ class PointCloudDataset(Dataset):
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
         self.name_to_label = {v: k for k, v in self.label_to_names.items()}
 
+        # Set uncertain pseudo labels (for pseudo label training) test -jer
+        if 10 in self.label_to_idx:
+            self.label_to_idx[10] = 10
+
     def augmentation_transform(self, points, normals=None, verbose=False):
         """Implementation of an augmentation transform for point clouds."""
 

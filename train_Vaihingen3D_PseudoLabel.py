@@ -138,7 +138,7 @@ class Vaihingen3DPLConfig(Config):
     #####################
 
     # Maximal number of epochs
-    max_epoch = 100
+    max_epoch = 150
 
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
@@ -156,7 +156,7 @@ class Vaihingen3DPLConfig(Config):
     validation_size = 200
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 20
+    checkpoint_gap = 50
 
     # Augmentations
     augment_scale_anisotropic = True

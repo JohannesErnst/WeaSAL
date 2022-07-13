@@ -423,7 +423,12 @@ class KPFCNN(nn.Module):
             N = outputs.shape[0]
             eps = 1e-8
             tensor_0 = torch.tensor(0).float().cuda()
-            threshold = config.contrast_thd / 100           # test this. Maybe the pseudo_logits have much higher probs here -jer
+            threshold = config.contrast_thd / 100           
+            
+            # test threshold. Maybe the pseudo_logits have much higher probs here -jer
+            # Well it seems like the probs are usually inbetween 0.11 and 0.21. So the threshold doesn't do anything here
+            # I guess then the whole contrast loss doesn't work properly for DALES (maybe mention that in thesis)
+            # ALso test this when having higher epochs...
             
             # Get probabilities
             prob = torch.nn.Softmax(1)(outputs) 
