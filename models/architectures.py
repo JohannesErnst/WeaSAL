@@ -402,23 +402,33 @@ class KPFCNN(nn.Module):
 
         return correct / total
 
-    def contrast_loss_w(self, outputs, labels, config, threshold=0.4, gt=None):
+    def contrast_loss(self, outputs, labels, config, threshold=0.2):
             """
-            Runs contrastive loss on outputs of the model
+            Runs contrastive loss on outputs of the model by selecting a number of
+            points (here slc_con) to compare with each input point and determining
+            whether they are negative (of different classes) or positive samples 
+            (of the same class). With this metric the contrastive loss is calculated.
             :param outputs: logits predicted by the network
-            :param labels: labels
+            :param labels: ground truth pseudo labels
+            :param threshold: threshold for ignoring uncertain labels
             :return: loss
             """
 
-            # Define parameter
+            # Define parameters
             temperature = 0.1
             base_temperature = 1
             self.pts_loss = 0
             self.pts_loss_self = 0
             slc_con = 1000
-            N = outputs.shape[0]        
+            N = outputs.shape[0]
+            eps = 1e-8
             tensor_0 = torch.tensor(0).float().cuda()
-            threshold = config.contrast_thd 
+            threshold = config.contrast_thd / 100           
+            
+            # test threshold. Maybe the pseudo_logits have much higher probs here -jer
+            # Well it seems like the probs are usually inbetween 0.11 and 0.21. So the threshold doesn't do anything here
+            # I guess then the whole contrast loss doesn't work properly for DALES (maybe mention that in thesis)
+            # ALso test this when having higher epochs...
             
             # Get probabilities
             prob = torch.nn.Softmax(1)(outputs) 
@@ -427,66 +437,69 @@ class KPFCNN(nn.Module):
             # Gather all labeled points and confident unlabeled points
             label_id = labels < 10
             certain_label = pseudo_logits > threshold
-            certain_label = (certain_label + label_id) > 0 
+            certain_label = (certain_label + label_id) > 0
 
-            # Get pseudo labels
+            # Get the valid pseudo labels
             pseudo_lbs = torch.argmax(prob, dim=1)
             pseudo_lbs[label_id] = labels[label_id] 
             all_valid_idx = torch.where(certain_label)[0]
 
-            # Random slc 2000 indx
-            nn = all_valid_idx.shape[0] 
-            if nn < 1:
-                print('skipped')
+            # Collect slc_con random indices from the valid pseudo labels (--> slice)
+            num_valid = all_valid_idx.shape[0] 
+            if num_valid < 1:
+                print('Skipped loss calculations because there are no valid points in batch')
                 return tensor_0
-            if nn >= slc_con:
-                slc_idx_idx = torch.randint(0,nn,(slc_con,))
+            if num_valid >= slc_con:
+                slc_idx_idx = torch.randint(0,num_valid,(slc_con,))
                 slc_idx = all_valid_idx[slc_idx_idx]
             else:
-                o_idx = torch.arange(nn)
-                slc_idx_idx =  torch.randint(0,nn,(slc_con-nn,))
-                slc_idx_idx = torch.stack((o_idx, slc_idx_idx), dim = 0)
+                o_idx = torch.arange(num_valid)
+                slc_idx_idx =  torch.randint(0,num_valid,(slc_con-num_valid,))
+                slc_idx_idx = torch.cat((o_idx, slc_idx_idx), dim = 0)
                 slc_idx = all_valid_idx[slc_idx_idx]
 
-            # Create a mask
-            mask1 = torch.ones(N, slc_con)
+            # Create a mask [N x slc_con] that marks all slice indices per input point
+            mask_slice = torch.ones(N, slc_con)
             all_idx = torch.arange(N).cuda()
             idx = torch.where(all_idx[:, None] == slc_idx[None, :])
             cc = torch.stack(idx, dim=0).T
             cc = cc.cuda()
-            mask1[cc[:,0], cc[:,1]] = 0
-            mask1 = mask1.cuda()
+            mask_slice[cc[:,0], cc[:,1]] = 0
+            mask_slice = mask_slice.cuda()
                     
+            # Collect pseudo labels and points of the slice
             pseudo_label_slc = pseudo_lbs[slc_idx]
+            certain_label_slc = certain_label[slc_idx]
             
-            certain_label_slc = certain_label[slc_idx] 
+            # Create a mask [N x slc_con] that marks all certain label indices per input point
+            mask_certain = certain_label_slc.unsqueeze(0) == certain_label.unsqueeze(-1) 
             
-            mask_certaion = certain_label_slc.unsqueeze(0) == certain_label.unsqueeze(-1) 
-            
-            pos_mask = pseudo_label_slc.unsqueeze(0) == pseudo_lbs.unsqueeze(-1) * mask1 * mask_certaion
-            # outputs = F.normalize(outputs, dim=1)               # what is F? Maybe this should be nn.functionals.normalize -jer
-            outputs = nn.functionals.normalize.normalize(outputs, dim=1)    
-            exit("Stop, once the code reaches this part double check the F.normalize part. Does it work (in Stefans code)? -jer")
+            # Create a mask [N x slc_con] that marks where the slice point labels are equal 
+            # to the input point labels (i.e. the so called positive samples in paper)
+            mask_positive = pseudo_label_slc.unsqueeze(0) == pseudo_lbs.unsqueeze(-1)
+
+            # Concatenate masks to get the positions of the points used for calculating 
+            # the supervised contrastive loss per input point
+            pos_mask = mask_positive * mask_slice * mask_certain
+
+            # Select normalized slice-logits as [N x slc_con] and weight with temperature
+            outputs = nn.functional.normalize(outputs, dim=1)
             x_slc = outputs[slc_idx]
-            
-            mul = torch.div(
-                torch.matmul(outputs, x_slc.T),
-                temperature)
-            eps = 1e-8
+            mul = torch.div(torch.matmul(outputs, x_slc.T), temperature)
 
             # For numerical stability
             logits_max, _ = torch.max(mul, dim=1, keepdim=True)
             logits = mul - logits_max.detach()
 
             # Compute logarithmic probability
-            exp_logits = torch.exp(logits) * (mask1 * mask_certaion) # (0,1]
-            log_prob = (logits - torch.log((exp_logits.sum(1, keepdim=True)+eps)))* (mask1 * mask_certaion) 
+            exp_logits = torch.exp(logits) * (mask_slice * mask_certain)
+            log_prob = (logits - torch.log((exp_logits.sum(1, keepdim=True)+eps))) * (mask_slice * mask_certain) 
 
-            # Compute mean of log-likelihood over positive samples
+            # Compute mean of log-likelihood over positive samples for each point.
             # If no positve samples are found, take them as 0
             mean_log_prob_pos = (pos_mask * log_prob).sum(1) / (pos_mask.sum(1)+1e-12)
             self.pts_loss = - (temperature / base_temperature) * mean_log_prob_pos
-            cal_slc = self.pts_loss>0
+            cal_slc = self.pts_loss > 0
             self.pts_loss = self.pts_loss[cal_slc]
             pseudo_lbs = pseudo_lbs[cal_slc]
             self.pts_loss = scatter(self.pts_loss, pseudo_lbs, reduce="mean")
@@ -497,7 +510,8 @@ class KPFCNN(nn.Module):
 
 class KPFCNN_mprm(nn.Module):
     """
-    Class defining KPFCNN for weak labels with multi-path region mining (mprm)
+    Class defining KPFCNN for weak labels with multi-path region mining (mprm) 
+    and elevation attention module.
     """
 
     def __init__(self, config, lbl_values, ign_lbls):
@@ -567,11 +581,11 @@ class KPFCNN_mprm(nn.Module):
                 out_dim *= 2
         
         self.multi_att = dual_att('attention', out_dim, out_dim, r, layer, config)
+        self.ele_head = ele_att('ele_attention', 2, out_dim, r, layer, config)
         self.no_ga = global_average_block('ga1', config.num_classes, config.num_classes, layer, config)
         self.da_ga = global_average_block('ga2', config.num_classes, config.num_classes, layer, config)
         self.spa_ga = global_average_block('ga3', config.num_classes, config.num_classes, layer, config)
-        self.cha_ga = global_average_block('ga4', config.num_classes, config.num_classes, layer, config)
-        
+        self.cha_ga = global_average_block('ga4', config.num_classes, config.num_classes, layer, config)     
 
         #####################
         # List Decoder blocks
@@ -621,12 +635,14 @@ class KPFCNN_mprm(nn.Module):
         # List of valid labels (those not ignored in loss)
         self.valid_labels = np.sort([c for c in lbl_values if c not in ign_lbls])
 
-        # Choose segmentation loss          # clear this part up once it is running. Might try to change this for better results though (look at original KPConv) -jer
+        # Choose segmentation loss
         if len(config.class_w) > 0:
             class_w = torch.from_numpy(np.array(config.class_w, dtype=np.float32))
-            self.criterion = torch.nn.CrossEntropyLoss(ignore_index=-1) #weight=class_w, 
+            self.criterion = torch.nn.CrossEntropyLoss(weight=class_w, ignore_index=-1)
+            self.criterion_multi = torch.nn.BCEWithLogitsLoss(weight=class_w)
         else:           
             self.criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
+            self.criterion_multi = torch.nn.BCEWithLogitsLoss()
         self.deform_fitting_mode = config.deform_fitting_mode
         self.deform_fitting_power = config.deform_fitting_power
         self.deform_lr_factor = config.deform_lr_factor
@@ -634,10 +650,8 @@ class KPFCNN_mprm(nn.Module):
         self.output_loss = 0
         self.reg_loss = 0
         self.l1 = nn.L1Loss()
-        class_w = torch.from_numpy(np.array(config.class_w, dtype=np.float32))
-        self.criterion_multi = torch.nn.BCEWithLogitsLoss() #weight=class_w
-        # self.criterion_sia = torch.nn.CrossEntropyLoss(weight=class_w)
         self.register_hooks()
+
         return
 
     def register_hooks(self):
@@ -658,14 +672,18 @@ class KPFCNN_mprm(nn.Module):
         # Get input features
         x = batch.features.clone().detach()
 
-        # Loop over consecutive blocks
+        # Include elevation attention
+        ele_down = batch.points[2][:,-1].unsqueeze_(-1).clone().detach()
+
+        # Loop over consecutive encoder blocks
         skip_x = []
         for block_i, block_op in enumerate(self.encoder_blocks):
             if block_i in self.encoder_skips:
                 skip_x.append(x)
             x = block_op(x, batch)
+        x = self.ele_head(x, ele_down, batch)
             
-        # Combine attention modules and get maximum 
+        # Combine attention modules and save logits
         spa_att, cha_att, no_att, dual_att = self.multi_att(x, batch)
 
         no_att_cla = self.no_ga(no_att, batch)
@@ -674,75 +692,37 @@ class KPFCNN_mprm(nn.Module):
         cha_att_cla = self.cha_ga(cha_att, batch)  
         
         cla_logits = [no_att_cla, dual_att_cla, spa_att_cla, cha_att_cla]
-               
-        x = torch.max(no_att, dual_att)
-        x = torch.max(x, spa_att)
-        x = torch.max(x, cha_att)
         
+        # Loop over consecutive decoder blocks
         for block_i, block_op in enumerate(self.decoder_blocks):
             no_att = block_op(no_att, batch)
             dual_att = block_op(dual_att, batch)
             spa_att = block_op(spa_att, batch)
             cha_att = block_op(cha_att, batch)
-            x = block_op(x, batch)
+
+        # Element-wise maximum to get pseudo labels
+        x = torch.max(no_att, dual_att)
+        x = torch.max(x, spa_att)
+        x = torch.max(x, cha_att)
             
         cam = [no_att, dual_att, spa_att, cha_att]
         
         return x, cla_logits, cam
-
-    def loss(self, outputs, labels):
-        """
-        Runs the loss on outputs of the model
-        :param outputs: logits
-        :param labels: labels
-        :return: loss
-        """
-
-        # Set all ignored labels to -1 and correct the other label to be in [0, C-1] range
-        target = - torch.ones_like(labels)
-        for i, c in enumerate(self.valid_labels):
-            target[labels == c] = i
-
-        # Reshape to have a minibatch size of 1
-        outputs = torch.transpose(outputs, 0, 1)
-        outputs = outputs.unsqueeze(0)
-        target = target.unsqueeze(0)
-
-        # Cross entropy loss
-        self.output_loss = self.criterion(outputs, target)
-
-        # Regularization of deformable offsets
-        if self.deform_fitting_mode == 'point2point':
-            self.reg_loss = p2p_fitting_regularizer(self)
-        elif self.deform_fitting_mode == 'point2plane':
-            raise ValueError('point2plane fitting mode not implemented yet.')
-        else:
-            raise ValueError('Unknown fitting mode: ' + self.deform_fitting_mode)
-
-        # Combined loss
-        return self.output_loss + self.reg_loss
    
-    def class_logits_loss(self, class_logits, cl_lb):
+    def class_logits_loss(self, class_logits, cloud_lb):
         """
-        Runs the BCEWithLogitsLoss (binary cross entropy) on outputs of the model
+        Runs the BCEWithLogitsLoss (binary cross entropy) on outputs of the model.
+        Uses one weak labels per input sphere (and not per subclouds).
         :param class_logits: logits
-        :param cl_lb: labels
+        :param cloud_lb: labels
         :return: loss
         """
-
-        # Set all ignored labels to -1 and correct the other label to be in [0, C-1] range
-        target = - torch.ones_like(cl_lb)
-        for i, c in enumerate(self.valid_labels):
-            target[cl_lb == c] = i
-
-        # Reshape to have a minibatch size of 1
-        target = target.unsqueeze(0)
 
         # BCEWithLogitsLoss on class logits
-        self.output_loss1 = self.criterion_multi(class_logits[0],cl_lb)
-        self.output_loss2 = self.criterion_multi(class_logits[1],cl_lb)
-        self.output_loss3 = self.criterion_multi(class_logits[2],cl_lb)
-        self.output_loss4 = self.criterion_multi(class_logits[3],cl_lb)        
+        self.output_loss1 = self.criterion_multi(class_logits[0],cloud_lb)
+        self.output_loss2 = self.criterion_multi(class_logits[1],cloud_lb)
+        self.output_loss3 = self.criterion_multi(class_logits[2],cloud_lb)
+        self.output_loss4 = self.criterion_multi(class_logits[3],cloud_lb)        
         
         # Regularization of deformable offsets
         if self.deform_fitting_mode == 'point2point':
@@ -757,10 +737,11 @@ class KPFCNN_mprm(nn.Module):
 
     def region_mprm_loss(self, cam, regions_all, regions_lb, batch_lengths):
         """
-        Runs the overlap region loss on outputs of the model
+        Runs the overlap region loss on outputs of the model.
+        Uses weak labels per subcloud (so multiple weak labels in one input sphere).
         :param cam: logits of attention modules (class activation map)
         :param regions_all: indices of subregion points
-        :param regions_lb: weak labels of subregions
+        :param regions_lb: ground truth weak labels of subregions
         :param batch_lengths: batch lengths
         :return: loss
         """        
@@ -777,8 +758,11 @@ class KPFCNN_mprm(nn.Module):
             regions = regions_all[ri]
             end_id = star_id + batch_lengths[ri]
             logits = cam_all[:,star_id:end_id,:]
-            
+
+            # Retrieve ground truth weak labels
             all_cls_lbs.append(np.stack(regions_lb[ri]).astype('float32'))
+
+            # Retrieve weak labels based on output logits (predicted)
             for ii in range(len(regions)):
                 slc_dix = regions[ii].astype('int64') 
                 slc_dix = torch.from_numpy(slc_dix).cuda()
@@ -787,236 +771,34 @@ class KPFCNN_mprm(nn.Module):
 
             star_id = star_id + batch_lengths[ri]
         
+        # Stack weak labels (ground truth and predicted) and calculate loss
         all_cls_lbs = np.vstack(all_cls_lbs)
         all_cls_lbs = torch.from_numpy(all_cls_lbs).cuda()
-        
-        # Stack features and calculate loss
         averaged_features = torch.stack(averaged_features)
         for ii in range(averaged_features.shape[1]):
             self.output_loss = self.output_loss + self.criterion_multi(averaged_features[:,ii,:],all_cls_lbs)
 
-        return self.output_loss 
+        return self.output_loss
 
-    def accuracy(self, outputs, labels):        
-        # These 2 accuracy functions are definitely sus. I think I only need one of them. 
-        # First one is used for pseudo label and second one for weak label script. 
-        # Only difference is the dim = 1 / -1. 
-        # This only makes a difference when logits dimension is 3D then dim -1 gives the same 
-        # results as dim 2 and dim -2 goives the same result as dim 1... 
-        # Debug this once pseudo label is running -jer
+    def accuracy(self, logits, labels):        
         """ 
         Computes accuracy of the current batch
-        :param outputs: logits predicted by the network
+        :param logits: logits output predicted by the network
         :param labels: labels
         :return: accuracy value
         """
+
+        # Check dimension
+        if not len(logits.size()) == 2:
+            raise ValueError('Wrong logits output dimension: Expected 2, got ' + str(len(logits.size())))
 
         # Set all ignored labels to -1 and correct the other label to be in [0, C-1] range
         target = - torch.ones_like(labels)
         for i, c in enumerate(self.valid_labels):
             target[labels == c] = i
 
-        predicted = torch.argmax(outputs.data, dim=1)
+        predicted = torch.argmax(logits, dim=1)
         total = target.size(0)
         correct = (predicted == target).sum().item()
 
         return correct / total
-
-    def accuracy_logits(self, logits, labels):
-        """
-        Computes accuracy of the current batch
-        :param logits: logits predicted by the network
-        :param labels: labels
-        :return: accuracy value
-        """
-
-        # Set all ignored labels to -1 and correct the other label to be in [0, C-1] range
-        target = - torch.ones_like(labels)
-        for i, c in enumerate(self.valid_labels):
-            target[labels == c] = i
-
-        predicted = torch.argmax(logits, dim=-1)
-        total = target.size(0)
-        correct = (predicted == target).sum().item()
-
-        return correct / total
-
-
-class KPFCNN_mprm_ele(KPFCNN_mprm):        
-    """
-    Class defining KPFCNN for weak labels (multi-path region mining) with elevation attention module
-    """
-
-    # Maybe I can just integrate this into the KPFCNN_mprm because I don't need the separation once it runs
-    # Maybe this was done by Lin to be able to compare MPRM vs the elevation attention approach -jer
-
-    def __init__(self, config, lbl_values, ign_lbls):
-        
-        KPFCNN_mprm.__init__(self, config, lbl_values, ign_lbls)
-
-        ############
-        # Parameters
-        ############
-
-        # Current radius of convolution and feature dimension
-        layer = 0
-        r = config.first_subsampling_dl * config.conv_radius
-        in_dim = config.in_features_dim
-        out_dim = config.first_features_dim
-        self.K = config.num_kernel_points
-        self.C = len(lbl_values) - len(ign_lbls)
-        self.features_layer = 'encoder_blocks.5.unary_shortcut.mlp'
-        self.forward_features = {}
-        self.backward_features = {}
-
-        #####################
-        # List Encoder blocks
-        #####################
-
-        # Save all block operations in a list of modules
-        self.encoder_blocks = nn.ModuleList()
-        self.encoder_skip_dims = []
-        self.encoder_skips = []
-
-        # Loop over consecutive blocks
-        for block_i, block in enumerate(config.architecture):
-
-            # Check equivariance
-            if ('equivariant' in block) and (not out_dim % 3 == 0):
-                raise ValueError('Equivariant block but features dimension is not a factor of 3')
-
-            # Detect change to next layer for skip connection
-            if np.any([tmp in block for tmp in ['pool', 'strided', 'upsample', 'global', 'attention']]):
-                self.encoder_skips.append(block_i)
-                self.encoder_skip_dims.append(in_dim)
-
-            # Detect upsampling block to stop
-            if 'attention' in block:
-                break            
-            if 'upsample' in block:
-                break
-                      
-            # Apply the good block function defining tf ops
-            self.encoder_blocks.append(block_decider(block,
-                                                    r,
-                                                    in_dim,
-                                                    out_dim,
-                                                    layer,
-                                                    config)) # r is radius
-
-            # Update dimension of input from output
-            if 'simple' in block:
-                in_dim = out_dim // 2
-            else:
-                in_dim = out_dim
-
-            # Detect change to a subsampled layer
-            if 'pool' in block or 'strided' in block:
-                # Update radius and feature dimension for next layer
-                layer += 1
-                r *= 2
-                out_dim *= 2
-
-        self.multi_att = dual_att('attention', out_dim, out_dim, r, layer, config)
-        self.ele_head = ele_att('ele_attention', 2, out_dim, r, layer, config)          # this is the important part, just to find it quickly later -jer
-        self.no_ga = global_average_block('ga1', config.num_classes, config.num_classes, layer, config)
-        self.da_ga = global_average_block('ga2', config.num_classes, config.num_classes, layer, config)
-        self.spa_ga = global_average_block('ga3', config.num_classes, config.num_classes, layer, config)
-        self.cha_ga = global_average_block('ga4', config.num_classes, config.num_classes, layer, config)
-        
-        #####################
-        # List Decoder blocks
-        #####################
-
-        # Save all block operations in a list of modules
-        self.decoder_blocks = nn.ModuleList()
-        self.decoder_concats = []
-
-        # Find first upsampling block
-        start_i = 0
-        for block_i, block in enumerate(config.architecture):
-            if 'upsample' in block:
-                start_i = block_i
-                break
-
-        # Loop over consecutive blocks
-        for block_i, block in enumerate(config.architecture[start_i:]):
-
-            # Add dimension of skip connection concat
-            if block_i > 0 and 'upsample' in config.architecture[start_i + block_i - 1]:
-                in_dim += self.encoder_skip_dims[layer]
-                self.decoder_concats.append(block_i)
-
-            # Apply the good block function defining tf ops
-            self.decoder_blocks.append(block_decider(block,
-                                                    r,
-                                                    in_dim,
-                                                    out_dim,
-                                                    layer,
-                                                    config))
-
-            # Update dimension of input from output
-            in_dim = out_dim
-
-            # Detect change to a subsampled layer
-            if 'upsample' in block:
-                # Update radius and feature dimension for next layer
-                layer -= 1
-                r *= 0.5
-                out_dim = out_dim // 2
-
-    def forward(self, batch, config):
-
-        # Get input features
-        x = batch.features.clone().detach()
-        
-        # Include elevation attention
-        ele_down = batch.points[2][:,-1].unsqueeze_(-1).clone().detach()
-
-        # Loop over consecutive blocks
-        skip_x = []
-        for block_i, block_op in enumerate(self.encoder_blocks):
-            if block_i in self.encoder_skips:
-                skip_x.append(x)
-            x = block_op(x, batch)
-        x = self.ele_head(x, ele_down, batch)    
-        
-        spa_att, cha_att, no_att, dual_att  = self.multi_att(x, batch)
-            
-        no_att_cla = self.no_ga(no_att, batch)
-        dual_att_cla = self.da_ga(dual_att, batch)
-        spa_att_cla = self.spa_ga(spa_att, batch)               # why are they leaving out the channel attention block here? -jer
-        
-        cla_logits = [no_att_cla, dual_att_cla, spa_att_cla]
-               
-        for block_i, block_op in enumerate(self.decoder_blocks):
-            no_att = block_op(no_att, batch)
-            dual_att = block_op(dual_att, batch)
-            spa_att = block_op(spa_att, batch)
-            cha_att = block_op(cha_att, batch)
-            
-        x = torch.max(no_att, dual_att)
-        x = torch.max(x, spa_att)
-        x = torch.max(x, cha_att)
-        
-        cam = [no_att, dual_att, spa_att, cha_att]
-
-        return x, cla_logits, cam        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

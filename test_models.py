@@ -7,7 +7,7 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Callable script to test networks on variable datasets
+#      Callable script to test any model on variable datasets
 #      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
@@ -21,19 +21,20 @@
 #
 
 # Common libs
-import signal
 import os
 import numpy as np
-import sys
-import torch
 
 # Dataset
-from datasets.Vaihingen3D import *
+from datasets.Vaihingen3D_WeakLabel import *
+from datasets.Vaihingen3D_PseudoLabel import *
+from datasets.DALES_WeakLabel import *
+from datasets.DALES_PseudoLabel import *
 from torch.utils.data import DataLoader
 
 from utils.config import Config
-from utils.tester_WeakLabel import ModelTester
-from models.architectures import KPCNN, KPFCNN
+from utils.tester_WeakLabel import ModelTesterWL
+from utils.tester_PseudoLabel import ModelTesterPL
+from models.architectures import *
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -49,13 +50,18 @@ def model_choice(chosen_log):
     ###########################
 
     # Automatically retrieve the last trained model
-    if chosen_log in ['last_ModelNet40', 'last_ShapeNetPart', 'last_S3DIS']:
+    if chosen_log in ['last_Vaihingen3DWL', 'last_Vaihingen3DPL', 'last_DALESWL', 'last_DALESPL']:
 
         # Dataset name
         test_dataset = '_'.join(chosen_log.split('_')[1:])
 
-        # List all training logs
-        logs = np.sort([os.path.join('results', f) for f in os.listdir('results') if f.startswith('Log')])
+        # List all training logs of either weak or pseudo label training
+        if test_dataset[-2:] == 'WL':
+            logs = np.sort([os.path.join('results/WeakLabel', f) 
+                            for f in os.listdir('results/WeakLabel') if f.startswith('Log')])
+        else:
+            logs = np.sort([os.path.join('results/PseudoLabel', f) 
+                            for f in os.listdir('results/PseudoLabel') if f.startswith('Log')])
 
         # Find the last log of asked dataset
         for log in logs[::-1]:
@@ -65,7 +71,7 @@ def model_choice(chosen_log):
                 chosen_log = log
                 break
 
-        if chosen_log in ['last_ModelNet40', 'last_ShapeNetPart', 'last_S3DIS']:
+        if chosen_log in ['last_Vaihingen3DWL', 'last_Vaihingen3DPL', 'last_DALESWL', 'last_DALESPL']:
             raise ValueError('No log of the dataset "' + test_dataset + '" found')
 
     # Check if log exists
@@ -90,9 +96,11 @@ if __name__ == '__main__':
     #   Here you can choose which model you want to test with the variable test_model. Here are the possible values :
     #
     #       > 'last_XXX': Automatically retrieve the last trained model on dataset XXX
-    #       > '(old_)results/Log_YYYY-MM-DD_HH-MM-SS': Directly provide the path of a trained model
+    #       > 'results/XLabel/Log_YYYY-MM-DD_HH-MM-SS': Directly provide the path of a trained model
 
-    chosen_log = 'results/Log_2022-05-05_14-21-26'
+    chosen_log = 'results/WeakLabel/Log_2022-06-28_08-27-45'
+    # chosen_log = 'last_DALESPL'
+    chosen_log = 'last_Vaihingen3DPL'
 
     # Choose the index of the checkpoint to load OR None if you want to load the current checkpoint
     chkp_idx = -1
@@ -102,6 +110,7 @@ if __name__ == '__main__':
 
     # Deal with 'last_XXXXXX' choices
     chosen_log = model_choice(chosen_log)
+    print('\nTesting on ' + chosen_log)
 
     ############################
     # Initialize the environment
@@ -144,6 +153,7 @@ if __name__ == '__main__':
     #config.in_radius = 4
     config.validation_size = 200
     config.input_threads = 10
+    config.dropout = 0
 
     ##############
     # Prepare Data
@@ -158,16 +168,27 @@ if __name__ == '__main__':
     else:
         set = 'test'
 
-    # Initiate dataset
-    if config.dataset == 'Vaihingen3D':
-        test_dataset = Vaihingen3DDataset(config, set=set, use_potentials=True)
-        test_sampler = Vaihingen3DSampler(test_dataset)
-        collate_fn = Vaihingen3DCollate
-    elif config.dataset == 'DALES':
-        print("Not implemented")
-        # test_dataset = DALESDataset(config, set=set, use_potentials=True)
-        # test_sampler = DALESSampler(test_dataset)
-        # collate_fn = DALESCollate
+    # Initiate dataset and set number of votes for testing
+    if config.dataset == 'Vaihingen3DWL':
+        test_dataset = Vaihingen3DWLDataset(config, set=set, use_potentials=True)
+        test_sampler = Vaihingen3DWLSampler(test_dataset)
+        collate_fn = Vaihingen3DWLCollate
+        num_votes = 10
+    elif config.dataset == 'Vaihingen3DPL':
+        test_dataset = Vaihingen3DPLDataset(config, set=set, use_potentials=True)
+        test_sampler = Vaihingen3DPLSampler(test_dataset)
+        collate_fn = Vaihingen3DPLCollate
+        num_votes = 10
+    elif config.dataset == 'DALESWL':
+        test_dataset = DALESWLDataset(config, set=set, use_potentials=True)
+        test_sampler = DALESWLSampler(test_dataset)
+        collate_fn = DALESWLCollate
+        num_votes = 1
+    elif config.dataset == 'DALESPL':
+        test_dataset = DALESPLDataset(config, set=set, use_potentials=True)
+        test_sampler = DALESPLSampler(test_dataset)
+        collate_fn = DALESPLCollate
+        num_votes = 1
     else:
         raise ValueError('Unsupported dataset : ' + config.dataset)
 
@@ -185,28 +206,24 @@ if __name__ == '__main__':
     print('\nModel Preparation')
     print('*****************')
 
-    # Define network model
+    # Define network model and tester (must match training network model)
     t1 = time.time()
-    if config.dataset_task == 'classification':
-        net = KPCNN(config)
-    elif config.dataset_task in ['cloud_segmentation', 'slam_segmentation']:
-        net = KPFCNN(config, test_dataset.label_values, test_dataset.ignored_labels)
+    if config.model_name == 'KPFCNN_mprm':
+        net = KPFCNN_mprm(config, test_dataset.label_values, test_dataset.ignored_labels)
+        tester = ModelTesterWL(net, chkp_path=chosen_chkp)
+    elif config.model_name == 'KPFCNN':
+        net = KPFCNN(config, test_dataset.label_values, test_dataset.ignored_labels) 
+        tester = ModelTesterPL(net, chkp_path=chosen_chkp)
     else:
-        raise ValueError('Unsupported dataset_task for testing: ' + config.dataset_task)
+        raise ValueError('Unsupported model for testing: ' + config.model_name)
 
-    # Define a visualizer class
-    tester = ModelTester(net, chkp_path=chosen_chkp)
     print('Done in {:.1f}s\n'.format(time.time() - t1))
 
     print('\nStart test')
     print('**********\n')
 
-    # Training
-    if config.dataset_task == 'classification':
-        tester.classification_test(net, test_loader, config)
-    elif config.dataset_task == 'cloud_segmentation':
-        tester.cloud_segmentation_test(net, test_loader, config, num_votes=0)
-    elif config.dataset_task == 'slam_segmentation':
-        tester.slam_segmentation_test(net, test_loader, config)
+    # Testing
+    if config.dataset_task == 'cloud_segmentation':
+        tester.cloud_segmentation_test(net, test_loader, config, num_votes)
     else:
         raise ValueError('Unsupported dataset_task for testing: ' + config.dataset_task)

@@ -7,7 +7,7 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Class handling Vaihingen dataset with weak region-labels (WL).
+#      Class handling DALES dataset with weak region-labels (WL).
 #      Implements a Dataset, a Sampler, and a collate function
 #      - adapted by Johannes Ernst
 #
@@ -47,29 +47,29 @@ from utils.anchors import *
 #       \******************************/
 
 
-class Vaihingen3DWLDataset(PointCloudDataset):
-    """Class to handle Vaihingen dataset with weak region-labels (WL)."""
+class DALESWLDataset(PointCloudDataset):
+    """Class to handle DALES dataset with weak region-labels (WL)."""
 
     def __init__(self, config, set='training', use_potentials=True, load_data=True):
         """
         This dataset is small enough to be stored in-memory, so load all point clouds here
         """
-        PointCloudDataset.__init__(self, 'Vaihingen3DWL')
+        PointCloudDataset.__init__(self, 'DALESWL')
 
         ############
         # Parameters
         ############
 
         # Dict from labels to names
-        self.label_to_names = {0: 'Powerline',
-                               1: 'LowVegetation',
-                               2: 'ImperviousSurfaces',
-                               3: 'Car',
-                               4: 'Fence/Hedge',
-                               5: 'Roof',
-                               6: 'Facade',
-                               7: 'Shrub',
-                               8: 'Tree'}
+        self.label_to_names = {0: 'Unknown',
+                               1: 'Ground',
+                               2: 'Vegetation',
+                               3: 'Cars',
+                               4: 'Trucks',
+                               5: 'Power',
+                               6: 'Poles',
+                               7: 'Fences',
+                               8: 'Buildings'}
 
         # Initialize a bunch of variables concerning class labels
         self.init_labels()
@@ -78,7 +78,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         self.ignored_labels = np.array([])
 
         # Dataset folder
-        self.path = 'data/Vaihingen3D'
+        self.path = 'data/DALES'
 
         # Type of task conducted on this dataset
         self.dataset_task = 'cloud_segmentation'
@@ -107,10 +107,30 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             ply_path = join(self.path, self.train_path)
 
         # Define datasets and splits
-        self.cloud_names = ['Vaihingen3D_Training', 'Vaihingen3D_Training', 'Vaihingen3D_Testing']
-        self.all_splits = [0, 1, 2]
-        self.validation_split = 1
-        self.test_split = 2
+        self.cloud_names = ['5080_54435','5085_54320','5095_54440','5095_54455',
+                            '5100_54495','5105_54405','5105_54460','5110_54320',
+                            '5110_54460','5110_54475','5110_54495','5115_54480',
+                            '5130_54355','5135_54495','5140_54445','5145_54340',
+                            '5145_54405','5145_54460','5145_54470','5145_54480',
+                            '5150_54340','5160_54330','5165_54390','5165_54395',
+                            '5180_54435','5180_54485','5185_54390','5185_54485',
+                            '5190_54400',
+                            '5080_54435','5085_54320','5095_54440','5095_54455',
+                            '5100_54495','5105_54405','5105_54460','5110_54320',
+                            '5110_54460','5110_54475','5110_54495','5115_54480',
+                            '5130_54355','5135_54495','5140_54445','5145_54340',
+                            '5145_54405','5145_54460','5145_54470','5145_54480',
+                            '5150_54340','5160_54330','5165_54390','5165_54395',
+                            '5180_54435','5180_54485','5185_54390','5185_54485',
+                            '5190_54400',
+                            'test_5080_54400','test_5080_54470','test_5100_54440',
+                            'test_5100_54490','test_5120_54445','test_5135_54430',
+                            'test_5135_54435','test_5140_54390','test_5150_54325',
+                            'test_5155_54335','test_5175_54395']
+        self.all_splits = list(range(0,69))
+        self.validation_split = list(range(29,58))
+        self.test_split = list(range(58,69))
+
 
         # Number of models used per epoch
         if self.set == 'training':
@@ -118,7 +138,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         elif self.set in ['validation', 'test', 'ERF']:
             self.epoch_n = config.validation_size * config.batch_num
         else:
-            raise ValueError('Unknown set for Vaihingen3DWL data: ', self.set)
+            raise ValueError('Unknown set for DALESWL data: ', self.set)
 
         # Stop data is not needed
         if not load_data:
@@ -128,7 +148,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         # Prepare ply files
         ###################
 
-        self.prepare_Vaihingen3D_ply()
+        self.prepare_DALES_ply()
 
         ################
         # Load ply files
@@ -138,33 +158,32 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         self.files = []
         for i, f in enumerate(self.cloud_names):
             if self.set == 'training':
-                if self.all_splits[i] != self.validation_split and self.all_splits[i] != self.test_split:
+                if self.all_splits[i] not in self.validation_split and self.all_splits[i] not in self.test_split:
                     self.files += [join(ply_path, f + '.ply')]
             elif self.set == 'test':
-                if self.all_splits[i] == self.test_split:
+                if self.all_splits[i] in self.test_split:
                     self.files += [join(ply_path, f + '.ply')]
             elif self.set in ['validation', 'ERF']:
-                if self.all_splits[i] == self.validation_split:
+                if self.all_splits[i] in self.validation_split:
                     self.files += [join(ply_path, f + '.ply')]
             else:
-                raise ValueError('Unknown set for Vaihingen3DWL data: ', self.set)
+                raise ValueError('Unknown set for DALESWL data: ', self.set)
 
         if self.set == 'training':
             self.cloud_names = [f for i, f in enumerate(self.cloud_names)
-                                if self.all_splits[i] != self.validation_split and self.all_splits[i] != self.test_split]
+                                if self.all_splits[i] not in self.validation_split and self.all_splits[i] not in self.test_split]
         elif self.set == 'test':
             self.cloud_names = [f for i, f in enumerate(self.cloud_names)
-                                if self.all_splits[i] == self.test_split]
+                                if self.all_splits[i] in self.test_split]
         elif self.set in ['validation', 'ERF']:
             self.cloud_names = [f for i, f in enumerate(self.cloud_names)
-                                if self.all_splits[i] == self.validation_split]
+                                if self.all_splits[i] in self.validation_split]
 
         if 0 < self.config.first_subsampling_dl <= 0.01:
             raise ValueError('subsampling_parameter too low (should be over 1 cm')
 
         # Initiate containers
         self.input_trees = []
-        self.input_colors = []
         self.input_labels = []
         self.pot_trees = []
         self.num_clouds = 0
@@ -418,7 +437,6 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 
             # Collect weak cloud-labels and colors (based on in_radius, see Wei et al.)
             input_points = (points[input_inds] - center_point).astype(np.float32)
-            input_colors = self.input_colors[cloud_ind][input_inds]
             if self.set in ['test', 'ERF']:
                 input_labels = np.zeros(input_points.shape[0])
             else:
@@ -435,12 +453,8 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             # Data augmentation
             input_points, scale, R = self.augmentation_transform(input_points)
 
-            # Color augmentation
-            if np.random.rand() > self.config.augment_color:
-                input_colors *= 0
-
             # Get original height as additional feature
-            input_features = np.hstack((input_colors, input_points[:, 2:] + center_point[:, 2:], input_points[:, 2:])).astype(np.float32)
+            input_features = np.hstack((input_points[:, 2:] + center_point[:, 2:], input_points[:, 2:])).astype(np.float32)
 
             t += [time.time()]
 
@@ -483,16 +497,14 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             cloud_lb = np.concatenate(cl_list, axis=0).astype('float32')
             cloud_all_lb = np.concatenate(cla_list, axis=0).astype('float32')
 
-        # Input features (4 means [ones  intensity absoluteHeight reducedHeight])
+        # Input features (3 means [ones absoluteHeight reducedHeight])
         stacked_features = np.ones_like(stacked_points[:, :1], dtype=np.float32)
         if self.config.in_features_dim == 1:
             pass
-        elif self.config.in_features_dim == 2:
-            stacked_features = np.hstack((stacked_features, features[:, :1]))
-        elif self.config.in_features_dim == 4:
-            stacked_features = np.hstack((stacked_features, features[:, :3]))
+        elif self.config.in_features_dim == 3:
+            stacked_features = np.hstack((stacked_features, features[:, :2]))
         else:
-            raise ValueError('Only accepted input dimensions are 1, 2 and 4')
+            raise ValueError('Only accepted input dimensions are 1 and 3')
 
         #######################
         # Create network inputs
@@ -581,7 +593,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             print('\n************************\n')
         return input_list
 
-    def prepare_Vaihingen3D_ply(self):
+    def prepare_DALES_ply(self):
         # Preparing files by reducing coordinates and converting to float32
 
         print('\nPreparing ply files')
@@ -601,9 +613,9 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 
         # Assign training/validation and test cloud names
         if self.set == 'test':
-            cloud_names_sort = [self.cloud_names[self.test_split]]
+            cloud_names_sort = [self.cloud_names[i] for i in self.test_split]     
         else:
-            cloud_names_sort = self.cloud_names[0:self.test_split]
+            cloud_names_sort = self.cloud_names[0:self.test_split[0]]
 
         # Prepare all clouds
         for cloud_name in cloud_names_sort:
@@ -615,7 +627,6 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 
             # Initiate containers
             cloud_points = np.empty((0, 3), dtype=np.float32)
-            cloud_colors = np.empty((0, 1), dtype=np.uint8)
             cloud_classes = np.empty((0, 1), dtype=np.int32)
 
             # Read ply file
@@ -626,16 +637,13 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             # Reduce coordinates by fixed offset and convert to float32
             cloud_points = (points - self.coord_offset).astype(np.float32)
 
-            # Define "color" as intensity
-            cloud_colors = (data['scalar_Intensity'].T).astype(np.uint8)
-
             # Get point classes
             cloud_classes = (np.vstack(data['scalar_Classification'])).astype(np.int32)
             
             # Save as ply
             write_ply(cloud_file,
-                      (cloud_points, cloud_colors, cloud_classes),
-                      ['x', 'y', 'z', 'intensity', 'class'])
+                      (cloud_points, cloud_classes),
+                      ['x', 'y', 'z', 'class'])
 
         print('Done in {:.1f}s'.format(time.time() - t0))
         return
@@ -672,11 +680,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 
                 # Read ply with data
                 data = read_ply(sub_ply_file)
-                sub_colors = data['intensity'].T
                 sub_labels = data['class']
-
-                if len(sub_colors.shape) == 1:
-                    sub_colors = np.expand_dims(sub_colors, axis=-1)
 
                 # Read pkl with search tree
                 with open(KDTree_file, 'rb') as f:
@@ -688,18 +692,14 @@ class Vaihingen3DWLDataset(PointCloudDataset):
                 # Read ply file
                 data = read_ply(file_path)
                 points = np.vstack((data['x'], data['y'], data['z'])).T
-                colors = data['intensity'].T
-                colors = np.expand_dims(colors, axis=-1)
                 labels = data['class']
 
                 # Subsample cloud
-                sub_points, sub_colors, sub_labels = grid_subsampling(points,
-                                                                      features=colors,
-                                                                      labels=labels,
-                                                                      sampleDl=dl)
+                sub_points, sub_labels = grid_subsampling(points,
+                                                          labels=labels,
+                                                          sampleDl=dl)
 
-                # Rescale float color and squeeze label
-                sub_colors = sub_colors / 255
+                # Squeeze labels
                 sub_labels = np.squeeze(sub_labels)
 
                 # Get chosen neighborhoods
@@ -713,15 +713,14 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 
                 # Save ply
                 write_ply(sub_ply_file,
-                          [sub_points, sub_colors, sub_labels],
-                          ['x', 'y', 'z', 'intensity', 'class'])
+                          [sub_points, sub_labels],
+                          ['x', 'y', 'z', 'class'])
 
             # Fill data containers
             self.input_trees += [search_tree]
-            self.input_colors += [sub_colors]
             self.input_labels += [sub_labels]
 
-            size = sub_colors.shape[0] * 4 * 5
+            size = sub_labels.shape[0] * 4 * 5
             print('{:.1f} MB loaded in {:.1f}s'.format(size * 1e-6, time.time() - t0))
 
         ############################
@@ -836,10 +835,10 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 #       \********************************/
 
 
-class Vaihingen3DWLSampler(Sampler):
-    """Sampler for Vaihingen3DWL"""
+class DALESWLSampler(Sampler):
+    """Sampler for DALESWL"""
 
-    def __init__(self, dataset: Vaihingen3DWLDataset):
+    def __init__(self, dataset: DALESWLDataset):
         Sampler.__init__(self, dataset)
 
         # Dataset used by the sampler (no copy is made in memory)
@@ -1298,8 +1297,8 @@ class Vaihingen3DWLSampler(Sampler):
         return
 
 
-class Vaihingen3DWLCustomBatch:
-    """Custom batch definition with memory pinning for Vaihingen3DWL"""
+class DALESWLCustomBatch:
+    """Custom batch definition with memory pinning for DALESWL"""
 
     def __init__(self, input_list):
 
@@ -1465,8 +1464,8 @@ class Vaihingen3DWLCustomBatch:
         return all_p_list
 
 
-def Vaihingen3DWLCollate(batch_data):
-    return Vaihingen3DWLCustomBatch(batch_data)
+def DALESWLCollate(batch_data):
+    return DALESWLCustomBatch(batch_data)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

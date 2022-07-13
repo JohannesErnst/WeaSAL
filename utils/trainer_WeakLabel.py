@@ -80,7 +80,6 @@ class ModelTrainer:
         deform_params = [v for k, v in net.named_parameters() if 'offset' in k]
         other_params = [v for k, v in net.named_parameters() if 'offset' not in k]
         deform_lr = config.learning_rate * config.deform_lr_factor
-        # here, Lin et al implemented adam algorithm as an optimizer but I think this is not needed (If confused just delete this comment) -jer
         self.optimizer = torch.optim.SGD([{'params': other_params},
                                           {'params': deform_params, 'lr': deform_lr}],
                                          lr=config.learning_rate,
@@ -115,7 +114,7 @@ class ModelTrainer:
         # Path of the result folder
         if config.saving:
             if config.saving_path is None:
-                config.saving_path = time.strftime('results/Log_%Y-%m-%d_%H-%M-%S', time.gmtime())
+                config.saving_path = time.strftime('results/WeakLabel/Log_%Y-%m-%d_%H-%M-%S', time.gmtime())
             if not exists(config.saving_path):
                 makedirs(config.saving_path)
             config.save()
@@ -194,8 +193,8 @@ class ModelTrainer:
                 if config.loss_type == 'region_mprm_loss':
                     loss = net.region_mprm_loss(self.cam, batch.region, batch.region_lb, batch.lengths[0])
                 else:
-                    loss = net.class_logits_loss(self.class_logits, batch.cl_lb)
-                acc = net.accuracy_logits(self.logits, batch.labels)
+                    loss = net.class_logits_loss(self.class_logits, batch.cloud_lb)
+                acc = net.accuracy(self.logits, batch.labels)
 
                 t += [time.time()]
 
@@ -235,7 +234,7 @@ class ModelTrainer:
                         message = '{:d} {:d} {:.3f} {:.3f} {:.3f} {:.3f}\n'
                         file.write(message.format(self.epoch,
                                                   self.step,
-                                                  net.output_loss,          # this is net.item in Lin et al. change if raises error -jer
+                                                  net.output_loss,
                                                   net.reg_loss,
                                                   acc,
                                                   t[-1] - t0))
@@ -490,10 +489,6 @@ class ModelTrainer:
                 makedirs(val_path)
             files = val_loader.dataset.files
             Confs = np.zeros((config.num_classes, config.num_classes), dtype=np.int32)
-            if config.dataset in ['rotterdam', 'Dales']:
-                # this needs to be changed since i don't use rotterdam. But do we even get here? -jer
-                exit("Stop here and look into code -jer")
-                Confs = np.zeros((config.num_classes+1, config.num_classes+1), dtype=np.int32)
                 
             for i, file_path in enumerate(files):
 
@@ -521,8 +516,9 @@ class ModelTrainer:
             # Save confusions
             c_path = join(val_path, 'conf.txt')
             np.savetxt(c_path, Confs, delimiter=' ', fmt='%i')
-            conf_matrix.plot(Confs, val_loader.dataset.label_to_names, val_path, 
-                             file_suffix=val_loader.dataset.cloud_names[0],
+            cm_name = val_loader.dataset.name + '_' + val_loader.dataset.set
+            conf_matrix.plot(Confs, val_loader.dataset.label_to_names, 
+                             val_path, file_suffix=cm_name,
                              abs_vals=False, F1=True, iou=True, show=False)
 
             # Remove ignored labels from confusions

@@ -7,8 +7,8 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Callable script to start a training with weak region-labels (WL) on Vaihingen3D dataset.
-#      This is based on the multi-path region mining (mprm) approach.
+#      Callable script to start a training with pseudo labels (PL) on DALES dataset.
+#      This is based on the standard KPConv architecture.
 #      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
@@ -24,16 +24,14 @@
 # Common libs
 import signal
 import os
-import time
 
 # Dataset
-from datasets.Vaihingen3D_WeakLabel import *
+from datasets.DALES_PseudoLabel import *
 from torch.utils.data import DataLoader
 
-# Utils
 from utils.config import Config
-from utils.trainer_WeakLabel import ModelTrainer
-from models.architectures import *
+from utils.trainer_PseudoLabel import ModelTrainer
+from models.architectures import KPFCNN
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -42,7 +40,7 @@ from models.architectures import *
 #       \******************/
 #
 
-class Vaihingen3DWLConfig(Config):
+class DALESPLConfig(Config):
     """
     Override the parameters you want to modify for this dataset
     """
@@ -52,7 +50,7 @@ class Vaihingen3DWLConfig(Config):
     ####################
 
     # Dataset name
-    dataset = 'Vaihingen3DWL'
+    dataset = 'DALESPL'
 
     # Number of classes in the dataset (This value is overwritten by dataset class when Initializating dataset).
     num_classes = None
@@ -67,15 +65,25 @@ class Vaihingen3DWLConfig(Config):
     # Architecture definition
     #########################
 
-    # Define layers
+    # Define layers (rigid KPConv version)
     architecture = ['simple',
                     'resnetb',
                     'resnetb_strided',
                     'resnetb',
                     'resnetb_strided',
                     'resnetb',
+                    'resnetb_strided',
+                    'resnetb',
+                    'resnetb_strided',
+                    'resnetb',
                     'nearest_upsample',
-                    'nearest_upsample']
+                    'unary',
+                    'nearest_upsample',
+                    'unary',
+                    'nearest_upsample',
+                    'unary',
+                    'nearest_upsample',
+                    'unary']
 
 
     ###################
@@ -86,19 +94,16 @@ class Vaihingen3DWLConfig(Config):
     num_kernel_points = 15
 
     # Radius of the input sphere (decrease value to reduce memory cost)
-    in_radius = 24
-
-    # Radius of the subcloud for weak labels (smaller means more labels but better results)
-    sub_radius = 6
+    in_radius = 20
 
     # Size of the first subsampling grid in meter (increase value to reduce memory cost)
-    first_subsampling_dl = 0.24
+    first_subsampling_dl = 0.4
 
     # Radius of convolution in "number grid cell" (2.5 is the standard value)
     conv_radius = 2.5
 
     # Radius of deformable convolution in "number grid cell". Larger so that deformed kernel can spread out
-    deform_radius = 1.0
+    deform_radius = 5.0
 
     # Radius of the area of influence of each kernel point in "number grid cell" (1.0 is the standard value)
     KP_extent = 1.0
@@ -109,9 +114,9 @@ class Vaihingen3DWLConfig(Config):
     # Aggregation function of KPConv in ('closest', 'sum')
     aggregation_mode = 'sum'
 
-    # Choice of input features (4 here means [ones  intensity absoluteHeight reducedHeight])
-    first_features_dim = 64
-    in_features_dim = 4
+    # Choice of input features
+    first_features_dim = 128
+    in_features_dim = 3
 
     # Can the network learn modulations
     modulated = False
@@ -133,44 +138,60 @@ class Vaihingen3DWLConfig(Config):
     #####################
 
     # Maximal number of epochs
-    max_epoch = 80
+    max_epoch = 200
 
     # Learning rate management (standard value is 1e-2)
-    learning_rate = 0.01
+    # learning_rate = 0.01
+    # momentum = 0.98
+    # lr_decays = {i: 0.1 ** (1 / 150) for i in range(1, max_epoch)}
+    learning_rate = 0.001
     momentum = 0.98
-    lr_decays = {i: 0.98 for i in range(1, 1000)}
-    grad_clip_norm = 1
+    lr_decays = {}
+    for i in range(1, 100):
+        if i % 5 == 0 and i < 101:
+            lr_decays[i] = 0.7
+        else:
+            lr_decays[i] = 1
+    grad_clip_norm = 100.0
 
-    # Number of batch (or number of input spheres)
+    # Number of batch (decrease to reduce memory cost, but it should remain > 3 for stability)
     batch_num = 4
 
     # Number of steps per epochs
-    epoch_steps = 600
+    epoch_steps = 100
 
     # Number of validation examples per epoch
     validation_size = 50
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 10
+    checkpoint_gap = 100
 
-    # Augmentations
+    # Augmentations  
     augment_scale_anisotropic = True
-    augment_symmetries = [True, True, False]
+    augment_symmetries = [True, False, False]   # describes symmetry of scale factor in x, y and z
     augment_rotation = 'vertical'
-    augment_scale_min = 0.8
-    augment_scale_max = 1.2
-    augment_noise = 0.04
+    augment_scale_min = 0.9
+    augment_scale_max = 1.1
+    augment_noise = 0.01
+    augment_color = 0.7
+
+    # Enable dropout
+    dropout = 0
+
+    # Parameters for supervised contrastive loss (start and threshold [%])
+    contrast_start = 0
+    contrast_thd = 2
+
+    # Choose model name and pseudo label log
+    model_name = 'KPFCNN'
+    weak_label_log = 'Log_2022-07-07_10-41-04'
 
     # Choose weights for class
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]
-
-    # Enable dropout
-    dropout = 0.5
-
-    # Other parameters
-    model_name = 'KPFCNN_mprm'
-    loss_type = 'region_mprm_loss'
-    anchor_method = 'reduced'
+    weight_file = join('data', dataset[:-2], 'PseudoLabels', weak_label_log,
+                       dataset[:-2] + '_t' + str(contrast_thd) + '_weight.txt')
+    if exists(weight_file):
+        class_w = np.genfromtxt(weight_file, delimiter=' ')
 
     # Do we nee to save convergence
     saving = True
@@ -208,7 +229,7 @@ if __name__ == '__main__':
     if previous_training_path:
 
         # Find all snapshot in the chosen training folder
-        chkp_path = os.path.join('results/WeakLabel', previous_training_path, 'checkpoints')
+        chkp_path = os.path.join('results/PseudoLabel', previous_training_path, 'checkpoints')
         chkps = [f for f in os.listdir(chkp_path) if f[:4] == 'chkp']
 
         # Find which snapshot to restore
@@ -216,7 +237,7 @@ if __name__ == '__main__':
             chosen_chkp = 'current_chkp.tar'
         else:
             chosen_chkp = np.sort(chkps)[chkp_idx]
-        chosen_chkp = os.path.join('results/WeakLabel', previous_training_path, 'checkpoints', chosen_chkp)
+        chosen_chkp = os.path.join('results/PseudoLabel', previous_training_path, 'checkpoints', chosen_chkp)
 
     else:
         chosen_chkp = None
@@ -230,9 +251,9 @@ if __name__ == '__main__':
     print('****************')
 
     # Initialize configuration class
-    config = Vaihingen3DWLConfig()
+    config = DALESPLConfig()
     if previous_training_path:
-        config.load(os.path.join('results/WeakLabel', previous_training_path))
+        config.load(os.path.join('results/PseudoLabel', previous_training_path))
         config.saving_path = None
 
     # Get path from argument if given
@@ -240,24 +261,24 @@ if __name__ == '__main__':
         config.saving_path = sys.argv[1]
 
     # Initialize datasets
-    training_dataset = Vaihingen3DWLDataset(config, set='training', use_potentials=True)
-    test_dataset = Vaihingen3DWLDataset(config, set='validation', use_potentials=True)
+    training_dataset = DALESPLDataset(config, set='training', use_potentials=True)
+    test_dataset = DALESPLDataset(config, set='validation', use_potentials=True)
 
     # Initialize samplers
-    training_sampler = Vaihingen3DWLSampler(training_dataset)
-    test_sampler = Vaihingen3DWLSampler(test_dataset)
+    training_sampler = DALESPLSampler(training_dataset)
+    test_sampler = DALESPLSampler(test_dataset)
 
     # Initialize the dataloader
     training_loader = DataLoader(training_dataset,
                                  batch_size=1,
                                  sampler=training_sampler,
-                                 collate_fn=Vaihingen3DWLCollate,
+                                 collate_fn=DALESPLCollate,
                                  num_workers=config.input_threads,
                                  pin_memory=True)
     test_loader = DataLoader(test_dataset,
                              batch_size=1,
                              sampler=test_sampler,
-                             collate_fn=Vaihingen3DWLCollate,
+                             collate_fn=DALESPLCollate,
                              num_workers=config.input_threads,
                              pin_memory=True)
 
@@ -275,8 +296,8 @@ if __name__ == '__main__':
 
     # Define network model
     t1 = time.time()
-    net = KPFCNN_mprm(config, training_dataset.label_values, training_dataset.ignored_labels)
-   
+    net = KPFCNN(config, training_dataset.label_values, training_dataset.ignored_labels)
+
     debug = False
     if debug:
         print('\n*************************************\n')

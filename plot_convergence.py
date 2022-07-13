@@ -21,14 +21,12 @@
 #
 
 # Common libs
-import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from os.path import isfile, join, exists
 from os import listdir, remove, getcwd
 from sklearn.metrics import confusion_matrix
-import time
 
 # My libs
 from utils.config import Config
@@ -37,6 +35,9 @@ from utils.ply import read_ply
 
 # Datasets
 from datasets.Vaihingen3D_WeakLabel import Vaihingen3DWLDataset
+from datasets.Vaihingen3D_PseudoLabel import Vaihingen3DPLDataset
+from datasets.DALES_WeakLabel import DALESWLDataset
+from datasets.DALES_PseudoLabel import DALESPLDataset
 
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -166,8 +167,14 @@ def load_snap_clouds(path, dataset, only_last=False):
     epoch_order = np.argsort(cloud_epochs)
     cloud_epochs = cloud_epochs[epoch_order]
     cloud_folders = cloud_folders[epoch_order]
-
+    
+    # Remove ignored labels from confusions
     Confs = np.zeros((len(cloud_epochs), dataset.num_classes, dataset.num_classes), dtype=np.int32)
+    for l_ind, label_value in reversed(list(enumerate(dataset.label_values))):
+        if label_value in dataset.ignored_labels:
+            Confs = np.delete(Confs, l_ind, axis=1)
+            Confs = np.delete(Confs, l_ind, axis=2)
+
     for c_i, cloud_folder in enumerate(cloud_folders):
         if only_last and c_i < len(cloud_epochs) - 1:
             continue
@@ -192,12 +199,6 @@ def load_snap_clouds(path, dataset, only_last=False):
             for f in listdir_str(cloud_folder):
                 if f.endswith('.ply'):
                     remove(join(cloud_folder, f))
-
-    # Remove ignored labels from confusions
-    for l_ind, label_value in reversed(list(enumerate(dataset.label_values))):
-        if label_value in dataset.ignored_labels:
-            Confs = np.delete(Confs, l_ind, axis=1)
-            Confs = np.delete(Confs, l_ind, axis=2)
 
     return cloud_epochs, IoU_from_confusions(Confs)
 
@@ -728,24 +729,27 @@ def compare_convergences_SLAM(dataset, list_of_paths, list_of_names=None):
 def experiment_name_1():
     """
     In this function you choose the results you want to plot together, to compare them as an experiment.
-    Just return the list of log paths (like 'results/Log_2020-04-04_10-04-42' for example), and the associated names
+    Just return the list of log paths (like 'results/WeakLabel/Log_2020-04-04_10-04-42' for example), and the associated names
     of these logs.
     Below an example of how to automatically gather all logs between two dates, and name them.
     """
 
     # Using the dates of the logs, you can easily gather consecutive ones. All logs should be of the same dataset.
-    start = 'Log_2022-05-30_14-32-37'
-    end = 'Log_2022-05-30_14-32-37'
+    start = 'Log_2022-07-12_10-44-42'
+    end = 'Log_2022-07-12_10-44-42'
 
-    # Name of the result path
-    res_path = 'results'
+    # Name of the result path (either WeakLabel or PseudoLabel)
+    # res_path = 'results/WeakLabel'
+    res_path = 'results/PseudoLabel'
 
     # Gather logs and sort by date
     logs = np.sort([join(res_path, l) for l in listdir_str(res_path) if start <= l <= end])
 
     # Give names to the logs (for plot legends)
-    logs_names = ['V3D weak label',
-                  '']
+    logs_names = ['V3D WL baseline',
+                  'no ele',
+                  'high augment',
+                  'low augment']
 
     # safe check log names
     logs_names = np.array(logs_names[:len(logs)])
@@ -756,7 +760,7 @@ def experiment_name_1():
 def experiment_name_2():
     """
     In this function you choose the results you want to plot together, to compare them as an experiment.
-    Just return the list of log paths (like 'results/Log_2020-04-04_10-04-42' for example), and the associated names
+    Just return the list of log paths (like 'results/WeakLabel/Log_2020-04-04_10-04-42' for example), and the associated names
     of these logs.
     Below an example of how to automatically gather all logs between two dates, and name them.
     """
@@ -765,15 +769,16 @@ def experiment_name_2():
     start = 'Log_2022-04-24_13-41-11'
     end = 'Log_2020-05-22_11-52-58'
 
-    # Name of the result path
-    res_path = 'results'
+    # Name of the result path (either WeakLabel or PseudoLabel)
+    res_path = 'results/WeakLabel'
+    res_path = 'results/PseudoLabel'
 
     # Gather logs and sort by date
     logs = np.sort([join(res_path, l) for l in listdir_str(res_path) if start <= l <= end])
 
     # Optionally add a specific log at a specific place in the log list
     logs = logs.astype('<U50')
-    logs = np.insert(logs, 0, 'results/Log_2020-04-04_10-04-42')
+    logs = np.insert(logs, 0, 'results/WeakLabel/Log_2020-04-04_10-04-42')
 
     # Give names to the logs (for plot legends)
     logs_names = ['name_log_inserted',
@@ -828,17 +833,21 @@ if __name__ == '__main__':
     compare_trainings(logs, logs_names)
 
     # Plot the validation
-    if config.dataset_task == 'classification':
-        compare_convergences_classif(logs, logs_names)
-    elif config.dataset_task == 'cloud_segmentation':
-        if config.dataset.startswith('Vaihingen3D'):
+    if config.dataset_task == 'cloud_segmentation':
+        if config.dataset.startswith('Vaihingen3DWL'):
             dataset = Vaihingen3DWLDataset(config, load_data=False)
             compare_convergences_segment(dataset, logs, logs_names) 
-        # elif config.dataset.startswith('DALES'):
-        #     dataset = DALESDataset(config, load_data=False)
-        #     compare_convergences_segment(dataset, logs, logs_names)
-    elif config.dataset_task == 'slam_segmentation':
-        raise ValueError('Slam segmentation currently not implemented')
+        elif config.dataset.startswith('Vaihingen3DPL'):
+            dataset = Vaihingen3DPLDataset(config, load_data=False)
+            compare_convergences_segment(dataset, logs, logs_names) 
+        elif config.dataset.startswith('DALESWL'):
+            dataset = DALESWLDataset(config, load_data=False)
+            compare_convergences_segment(dataset, logs, logs_names)
+        elif config.dataset.startswith('DALESPL'):
+            dataset = DALESPLDataset(config, load_data=False)
+            compare_convergences_segment(dataset, logs, logs_names)
+        else:
+            raise ValueError('Unsupported dataset : ' + plot_dataset)
     else:
         raise ValueError('Unsupported dataset : ' + plot_dataset)
 

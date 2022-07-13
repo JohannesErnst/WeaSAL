@@ -265,12 +265,18 @@ class Config:
                     self.class_w = [float(w) for w in line_info[2:]]
 
                 elif line_info[0] == 'dropout':
-                    setattr(self, line_info[0], line_info[2]) 
+                    setattr(self, line_info[0], float(line_info[2])) 
                 
                 elif line_info[0] == 'model_name':
                     setattr(self, line_info[0], line_info[2])
 
                 elif line_info[0] == 'loss_type':
+                    setattr(self, line_info[0], line_info[2])
+
+                elif line_info[0] == 'sub_radius':
+                    setattr(self, line_info[0], float(line_info[2]))
+                
+                elif line_info[0] == 'anchor_method':
                     setattr(self, line_info[0], line_info[2])
 
                 elif hasattr(self, line_info[0]):
@@ -398,25 +404,18 @@ class Config:
             
             if hasattr(self, 'sub_radius'):
                 text_file.write('sub_radius = {:.6f}\n'.format(self.sub_radius))
-            if hasattr(self, 'xyz_offset'):
-                text_file.write('xyz_offset =')
-                for a in self.xyz_offset:
-                    text_file.write(' {:.6f}'.format(a))
-            text_file.write('\n')
-            if hasattr(self, 'model_name'):                         
+            if hasattr(self, 'model_name'):         
                 text_file.write('model_name = {:s}\n'.format(self.model_name))
-            if hasattr(self, 'loss_type'):                          # check the following hasattr whether to delete -jer
-                text_file.write('loss_type = {:s}\n'.format(self.loss_type))       
+            if hasattr(self, 'loss_type'):
+                text_file.write('loss_type = {:s}\n'.format(self.loss_type))
             if hasattr(self, 'contrast_start'):
-                text_file.write('contrast_start = {:.6f}\n'.format(self.contrast_start))      
+                text_file.write('contrast_start = {:.6f}\n'.format(self.contrast_start))
             if hasattr(self, 'contrast_thd'):
-                text_file.write('contrast_thd = {:.6f}\n'.format(self.contrast_thd))       
+                text_file.write('contrast_thd[%] = {:.6f}\n'.format(self.contrast_thd))
             if hasattr(self, 'anchor_method'):
-                text_file.write('anchor_method = {:s}\n'.format(self.anchor_method))                                                  
-            if hasattr(self, 'model_n'):
-                text_file.write('model_n = {:s}\n'.format(self.model_n))        
-            # if hasattr(self, 'slc_con'):
-            #     text_file.write('slc_con = {:.3f}\n'.format(self.slc_con))  
+                text_file.write('anchor_method = {:s}\n'.format(self.anchor_method))                   
+            if hasattr(self, 'weak_label_log'):
+                text_file.write('weak_label_log = {:s}\n'.format(self.weak_label_log))
             if hasattr(self, 'dropout'):
                 text_file.write('dropout = {:.3f}\n'.format(self.dropout))
 

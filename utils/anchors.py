@@ -22,7 +22,7 @@ import numpy as np
 from utils.mayavi_visu import *
 
 
-def get_anchors(points, sub_radius, xyz_offset=[0,0,0], method='full'):
+def get_anchors(points, sub_radius, method='full'):
     """
     Return anchor points (n_anchors) for specified pointcloud
     """
@@ -38,27 +38,26 @@ def get_anchors(points, sub_radius, xyz_offset=[0,0,0], method='full'):
 
     # Find regularly spaced anchor positions 
     if method == 'full':
+        # This method uses anchors with a spacing of sub_radius
         x_step = np.floor((x_max - x_min) / sub_radius) + 1
         y_step = np.floor((y_max - y_min) / sub_radius) + 1
         z_step = np.floor((z_max - z_min) / sub_radius) + 1  
-        x_num = np.linspace(x_min, x_max, x_step.astype('int'))+xyz_offset[0]
-        y_num = np.linspace(y_min, y_max, y_step.astype('int'))+xyz_offset[1]
-        z_num = np.linspace(z_min, z_max, z_step.astype('int'))+xyz_offset[2]
+        x_num = np.linspace(x_min, x_max, x_step.astype('int'))
+        y_num = np.linspace(y_min, y_max, y_step.astype('int'))
+        z_num = np.linspace(z_min, z_max, z_step.astype('int'))
         for x in x_num:
             for y in y_num:
                 for z in z_num:
                     n_anchors.append([x, y, z])
 
-    # what exactly is the difference between reduce1 and full? Look at image created in blender. 
-    # generally you want to find a good compromise between number of weak labels and performance.
-    # reduce1 just uses lesse weak labels. Might experiment with this and rename at some point -jer
-    elif method == 'reduce1':          
+    elif method == 'reduced':
+        # This method uses half of the anchors used in 'full'
         x_step = np.floor((x_max - x_min) / (2*sub_radius)) + 1
         y_step = np.floor((y_max - y_min) / (2*sub_radius)) + 1
         z_step = np.floor((z_max - z_min) / (2*sub_radius)) + 1  
-        x_num = np.linspace(x_min, x_max, x_step.astype('int'))+xyz_offset[0]
-        y_num = np.linspace(y_min, y_max, y_step.astype('int'))+xyz_offset[1]
-        z_num = np.linspace(z_min, z_max, z_step.astype('int'))+xyz_offset[2]
+        x_num = np.linspace(x_min, x_max, x_step.astype('int'))
+        y_num = np.linspace(y_min, y_max, y_step.astype('int'))
+        z_num = np.linspace(z_min, z_max, z_step.astype('int'))
         for x in x_num:
             for y in y_num:
                 for z in z_num:
@@ -70,27 +69,7 @@ def get_anchors(points, sub_radius, xyz_offset=[0,0,0], method='full'):
                     
     return np.array(n_anchors)
 
-# def remove_empty_anchors(input_tree, anchors, radius):
-#     """
-#     Return anchors (i.e. subregions) that have more than 3 points inside
-#     I think this function is actually never used. remove if never used -jer
-#     """
-#     clean_anchors = []
-#     for i in range(anchors.shape[0]):
-
-#         # Collect number of points in subregion
-#         center_point = anchors[i].reshape(1, -1)
-#         input_inds = input_tree.query_radius(center_point, r=radius)[0]
-#         n = input_inds.shape[0]
-
-#         # Save anchors with more than 3 points
-#         if n > 2 :
-#             clean_anchors += [anchors[i]]
-
-#     return np.array(clean_anchors)
-
 def anchors_with_points(input_tree, anchors, lbs, radius, n_class):
-    # This was once named anchors_part_lbs. Just fyi when trying to find the function -jer
     """
     Return anchors (i.e. subregions) that have points inside
     """
@@ -126,7 +105,6 @@ def update_anchors(input_tree, clean_anchors, anchor_tree, anchors_dict, anchor_
     """
     cc = len(anchors_dict.keys())
     points = np.array(input_tree.data)
-    print('Updating anchors:')
     print('Anchors without considering overlap: {:.0f}'.format(cc))
 
     # Search neighbouring anchors

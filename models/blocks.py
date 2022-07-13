@@ -66,7 +66,6 @@ def gather(x, idx, method=2):
     else:
         raise ValueError('Unkown method')
 
-# Lin et al included index_normalize here but is never referenced -jer
 
 def radius_gaussian(sq_r, sig, eps=1e-9):
     """

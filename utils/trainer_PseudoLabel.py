@@ -35,6 +35,9 @@ import sys
 # PLY reader
 from utils.ply import read_ply, write_ply
 
+# Confusion matrix function
+import utils.conf_matrix as conf_matrix
+
 # Metrics
 from utils.metrics import IoU_from_confusions, fast_confusion
 from utils.config import Config
@@ -111,7 +114,7 @@ class ModelTrainer:
         # Path of the result folder
         if config.saving:
             if config.saving_path is None:
-                config.saving_path = time.strftime('results/Log_%Y-%m-%d_%H-%M-%S', time.gmtime())
+                config.saving_path = time.strftime('results/PseudoLabel/Log_%Y-%m-%d_%H-%M-%S', time.gmtime())
             if not exists(config.saving_path):
                 makedirs(config.saving_path)
             config.save()
@@ -188,7 +191,7 @@ class ModelTrainer:
                 loss = net.loss(outputs, batch.labels)
                 loss_contrast = torch.tensor(0).float().cuda()
                 if self.epoch >= config.contrast_start:
-                    loss_contrast = net.contrast_loss_w(outputs, batch.labels, config)
+                    loss_contrast = net.contrast_loss(outputs, batch.labels, config)
 
                 loss = loss + loss_contrast
                 acc = net.accuracy(outputs, batch.labels)
@@ -306,9 +309,7 @@ class ModelTrainer:
         softmax = torch.nn.Softmax(1)
 
         # Do not validate if dataset has no validation cloud
-        # should this be like in lin et al: "if val_loader.dataset.validation_split[0] not in val_loader.dataset.all_splits:"? -jer
         if val_loader.dataset.validation_split not in val_loader.dataset.all_splits:
-            exit("Check comment above -jer")
             return
 
         # Number of classes including ignored labels
@@ -466,7 +467,7 @@ class ModelTrainer:
                 if not exists(pot_path):
                     makedirs(pot_path)
                 files = val_loader.dataset.files
-                for i, file_path in enumerate(files):       # this part is deleted in lin et al. Delte as well? -jer
+                for i, file_path in enumerate(files):
                     pot_points = np.array(val_loader.dataset.pot_trees[i].data, copy=False)
                     cloud_name = file_path.split('/')[-1]
                     pot_name = join(pot_path, cloud_name)
@@ -487,11 +488,7 @@ class ModelTrainer:
             if not exists(val_path):
                 makedirs(val_path)
             files = val_loader.dataset.files
-            Confs = np.zeros((config.num_classes, config.num_classes), dtype=np.int32)
-            if config.dataset in ['rotterdam', 'Dales', 'Vaihingen']:
-                # this needs to be changed since i don't use rotterdam. But do we even get here? Why the +1? -jer
-                exit("Stop here and look into code -jer")
-                Confs = np.zeros((config.num_classes+1, config.num_classes+1), dtype=np.int32)
+            Confs = np.zeros((config.num_classes+1, config.num_classes+1), dtype=np.int32)
                 
             for i, file_path in enumerate(files):
 
@@ -515,16 +512,21 @@ class ModelTrainer:
                 # Add up confusions
                 labels = val_loader.dataset.validation_labels[i].astype(np.int32)
                 Confs += fast_confusion(labels, preds, val_loader.dataset.label_values).astype(np.int32)
-            
-            # Save confusions
-            c_path = join(val_path, 'conf.txt')
-            np.savetxt(c_path, Confs, delimiter=' ', fmt='%i')
 
             # Remove ignored labels from confusions
             for l_ind, label_value in reversed(list(enumerate(val_loader.dataset.label_values))):
                 if label_value in val_loader.dataset.ignored_labels:
                     Confs = np.delete(Confs, l_ind, axis=0)
                     Confs = np.delete(Confs, l_ind, axis=1)
+
+            # Save confusions
+            c_path = join(val_path, 'conf.txt')
+            np.savetxt(c_path, Confs, delimiter=' ', fmt='%i')
+            cm_name = val_loader.dataset.name + '_' + val_loader.dataset.set
+            valid_label_names = dict.copy(val_loader.dataset.label_to_names)
+            del valid_label_names[10]
+            conf_matrix.plot(Confs, valid_label_names, val_path, file_suffix=cm_name, 
+                             abs_vals=False, F1=True, iou=True, show=False)
 
             # Print IoUs            
             IoUs = IoU_from_confusions(Confs)

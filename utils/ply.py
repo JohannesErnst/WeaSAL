@@ -21,13 +21,9 @@
 #      \**********************************/
 #
 
-# If i get an error in this script use the "def remove_empty" from Weak_ALS. If not just leave this script like this -jer
-
-
 # Basic libs
 import numpy as np
 import sys
-
 
 # Define PLY types
 ply_dtypes = dict([

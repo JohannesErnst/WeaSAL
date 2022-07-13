@@ -7,7 +7,8 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-#      Callable script to start a training on Vaihingen3D dataset
+#      Callable script to start a training with pseudo labels (PL) on Vaihingen3D dataset.
+#      This is based on the standard KPConv architecture.
 #      - adapted by Johannes Ernst
 #
 # ----------------------------------------------------------------------------------------------------------------------
@@ -25,11 +26,11 @@ import signal
 import os
 
 # Dataset
-from datasets.Vaihingen3D import *
+from datasets.Vaihingen3D_PseudoLabel import *
 from torch.utils.data import DataLoader
 
 from utils.config import Config
-from utils.trainer_WeakLabel import ModelTrainer
+from utils.trainer_PseudoLabel import ModelTrainer
 from models.architectures import KPFCNN
 
 
@@ -39,7 +40,7 @@ from models.architectures import KPFCNN
 #       \******************/
 #
 
-class Vaihingen3DConfig(Config):
+class Vaihingen3DPLConfig(Config):
     """
     Override the parameters you want to modify for this dataset
     """
@@ -49,7 +50,7 @@ class Vaihingen3DConfig(Config):
     ####################
 
     # Dataset name
-    dataset = 'Vaihingen3D'
+    dataset = 'Vaihingen3DPL'
 
     # Number of classes in the dataset (This value is overwritten by dataset class when Initializating dataset).
     num_classes = None
@@ -137,7 +138,7 @@ class Vaihingen3DConfig(Config):
     #####################
 
     # Maximal number of epochs
-    max_epoch = 300
+    max_epoch = 150
 
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
@@ -152,7 +153,7 @@ class Vaihingen3DConfig(Config):
     epoch_steps = 200
 
     # Number of validation examples per epoch
-    validation_size = 20
+    validation_size = 200
 
     # Number of epoch between each checkpoint
     checkpoint_gap = 50
@@ -161,20 +162,28 @@ class Vaihingen3DConfig(Config):
     augment_scale_anisotropic = True
     augment_symmetries = [True, True, True]     # describes symmetry of scale factor in x, y and z
     augment_rotation = 'vertical'
-    augment_scale_min = 0.3
+    augment_scale_min = 0.2
     augment_scale_max = 1.8
     augment_noise = 0.06
-    augment_color = 0.6
-    
-
-    # The way we balance segmentation loss
-    #   > 'none': Each point in the whole batch has the same contribution.
-    #   > 'class': Each class has the same contribution (points are weighted according to class balance)
-    #   > 'batch': Each cloud in the batch has the same contribution (points are weighted according cloud sizes)
-    segloss_balance = 'class'
+    augment_color = 0.7
 
     # Enable dropout
     dropout = 0.5
+
+    # Parameters for supervised contrastive loss (start and threshold [%])
+    contrast_start = 0
+    contrast_thd = 20
+
+    # Choose model name and pseudo label log
+    model_name = 'KPFCNN'
+    weak_label_log = 'Log_2022-07-06_14-08-24'
+
+    # Choose weights for class
+    class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]
+    weight_file = join('data', dataset[:-2], 'PseudoLabels', weak_label_log,
+                       dataset[:-2] + '_t' + str(contrast_thd) + '_weight.txt')
+    if exists(weight_file):
+        class_w = np.genfromtxt(weight_file, delimiter=' ')
 
     # Do we nee to save convergence
     saving = True
@@ -212,7 +221,7 @@ if __name__ == '__main__':
     if previous_training_path:
 
         # Find all snapshot in the chosen training folder
-        chkp_path = os.path.join('results', previous_training_path, 'checkpoints')
+        chkp_path = os.path.join('results/PseudoLabel', previous_training_path, 'checkpoints')
         chkps = [f for f in os.listdir(chkp_path) if f[:4] == 'chkp']
 
         # Find which snapshot to restore
@@ -220,7 +229,7 @@ if __name__ == '__main__':
             chosen_chkp = 'current_chkp.tar'
         else:
             chosen_chkp = np.sort(chkps)[chkp_idx]
-        chosen_chkp = os.path.join('results', previous_training_path, 'checkpoints', chosen_chkp)
+        chosen_chkp = os.path.join('results/PseudoLabel', previous_training_path, 'checkpoints', chosen_chkp)
 
     else:
         chosen_chkp = None
@@ -234,9 +243,9 @@ if __name__ == '__main__':
     print('****************')
 
     # Initialize configuration class
-    config = Vaihingen3DConfig()
+    config = Vaihingen3DPLConfig()
     if previous_training_path:
-        config.load(os.path.join('results', previous_training_path))
+        config.load(os.path.join('results/PseudoLabel', previous_training_path))
         config.saving_path = None
 
     # Get path from argument if given
@@ -244,24 +253,24 @@ if __name__ == '__main__':
         config.saving_path = sys.argv[1]
 
     # Initialize datasets
-    training_dataset = Vaihingen3DDataset(config, set='training', use_potentials=True)
-    test_dataset = Vaihingen3DDataset(config, set='validation', use_potentials=True)
+    training_dataset = Vaihingen3DPLDataset(config, set='training', use_potentials=True)
+    test_dataset = Vaihingen3DPLDataset(config, set='validation', use_potentials=True)
 
     # Initialize samplers
-    training_sampler = Vaihingen3DSampler(training_dataset)
-    test_sampler = Vaihingen3DSampler(test_dataset)
+    training_sampler = Vaihingen3DPLSampler(training_dataset)
+    test_sampler = Vaihingen3DPLSampler(test_dataset)
 
     # Initialize the dataloader
     training_loader = DataLoader(training_dataset,
                                  batch_size=1,
                                  sampler=training_sampler,
-                                 collate_fn=Vaihingen3DCollate,
+                                 collate_fn=Vaihingen3DPLCollate,
                                  num_workers=config.input_threads,
                                  pin_memory=True)
     test_loader = DataLoader(test_dataset,
                              batch_size=1,
                              sampler=test_sampler,
-                             collate_fn=Vaihingen3DCollate,
+                             collate_fn=Vaihingen3DPLCollate,
                              num_workers=config.input_threads,
                              pin_memory=True)
 
