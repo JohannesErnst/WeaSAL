@@ -168,6 +168,12 @@ class ModelTrainer:
             self.step = 0
             for batch in training_loader:
 
+                # Check if batch contains no subregion labels
+                # In this case we cannot calculate loss
+                # Is this the best option to just skip the batch? -jer
+                if not any(batch.region):
+                    continue
+
                 # Check kill signal (running_PID.txt deleted)
                 if config.saving and not exists(PID_file):
                     continue

@@ -30,20 +30,21 @@ from utils.anchors import *
 #
 
 
-def get_weak_labels_per_point(cloud_name, sub_folder, num_classes):
+def get_weak_labels_per_point(cloud_name, sub_folder, anchor_method, num_classes):
     """
     Get point-wise weak labels for the given input cloud. 
     Uses subcloud labels and overlap region labels as weak labels.
 
     :param cloud_name: Input cloud to create the weak labels for
     :param sub_folder: Folder to subsampled data
+    :param anchor_method: Method for selecting the anchors
     :param num_classes: Number of classes for dataset
     :return: weak_labels
     """
 
     # Name of the input files
     KDTree_file = join(sub_folder, '{:s}_KDTree.pkl'.format(cloud_name))
-    anchors_file = join(sub_folder, '{:s}_anchors.pkl'.format(cloud_name))
+    anchors_file = join(sub_folder, '{:s}_anchors_{:s}.pkl'.format(cloud_name, anchor_method))
 
     # Get data and read pkl with search tree
     if not exists(KDTree_file):
@@ -130,7 +131,7 @@ for file in refinement_list:
 
     # Refine probabilities with ground truth weak labels of subsampled cloud
     print('Getting point-wise weak labels for "' + file_name + '"')
-    weak_labels = get_weak_labels_per_point(file_name, sub_folder, config.num_classes)
+    weak_labels = get_weak_labels_per_point(file_name, sub_folder, config.anchor_method, config.num_classes)
     probs = probs[indices]
     probs = probs*weak_labels
 

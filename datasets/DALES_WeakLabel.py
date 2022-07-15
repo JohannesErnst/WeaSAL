@@ -210,7 +210,7 @@ class DALESWLDataset(PointCloudDataset):
             for i, tree in enumerate(self.input_trees):
                 print('Preparing anchors and weak labels (' +
                       str(i+1) + '/' + str(len(self.input_trees)) + ')')
-                anchors_file = join(self.tree_path, '{:s}_anchors.pkl'.format(self.cloud_names[i]))
+                anchors_file = join(self.tree_path, '{:s}_anchors_{:s}.pkl'.format(self.cloud_names[i], config.anchor_method))           
 
                 # Check if anchors have already been computed
                 if exists(anchors_file):

@@ -191,7 +191,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             for i, tree in enumerate(self.input_trees):
                 print('Preparing anchors and weak labels (' +
                       str(i+1) + '/' + str(len(self.input_trees)) + ')')
-                anchors_file = join(self.tree_path, '{:s}_anchors.pkl'.format(self.cloud_names[i]))
+                anchors_file = join(self.tree_path, '{:s}_anchors_{:s}.pkl'.format(self.cloud_names[i], config.anchor_method))
 
                 # Check if anchors have already been computed
                 if exists(anchors_file):
@@ -210,6 +210,10 @@ class Vaihingen3DWLDataset(PointCloudDataset):
                     # Update subregion information according to overlaps
                     anchor, anchor_tree, anchors_dict, anchor_lb = update_anchors(
                         tree, anchor, anchor_tree, anchors_dict, anchor_lb, config.sub_radius)
+                    
+                    # Save the anchors as point cloud for visualization
+                    anchor_file_name = anchors_file[:-4]
+                    write_ply(anchor_file_name, [anchor+self.coord_offset], ['x', 'y', 'z'])
 
                     # Save anchors as pickle file
                     with open(anchors_file, 'wb') as f:
@@ -456,7 +460,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             cen_list += [center_point]
             if self.set == 'training':
                 cl_list += [cloud_labels]
-                cla_list += [cloud_labels_all]            
+                cla_list += [cloud_labels_all]
                 region_list += [region_idx]
                 region_lb_list += [region_lb]
 

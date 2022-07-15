@@ -65,6 +65,17 @@ def get_anchors(points, sub_radius, method='full'):
                     n_anchors.append([x, y, z + sub_radius])
                     n_anchors.append([x + sub_radius, y + sub_radius, z])
                     n_anchors.append([x + sub_radius, y + sub_radius, z + sub_radius])
+
+    if method == 'al_100':
+        # This method uses approimately 100 anchors with linear spacing 
+        # --> for Vaihingen3D active learning
+        x_num = np.linspace(x_min, x_max, 12)
+        y_num = np.linspace(y_min, y_max, 12)
+        z_num = np.linspace(z_min, z_max, 4)
+        for x in x_num:
+            for y in y_num:
+                for z in z_num:
+                    n_anchors.append([x, y, z])
                  
                     
     return np.array(n_anchors)
@@ -92,7 +103,7 @@ def anchors_with_points(input_tree, anchors, lbs, radius, n_class):
             cls_lbs = np.unique(slc_lbs)
             cloud_labels = np.zeros((n_class))
             cloud_labels[cls_lbs] = 1
-            anchor_lbs[cc] = cloud_labels    
+            anchor_lbs[cc] = cloud_labels
             cc = cc + 1
             
     clean_anchors = np.array(clean_anchors)

@@ -751,25 +751,36 @@ class KPFCNN_mprm(nn.Module):
         all_cls_lbs = []
         self.output_loss = 0
         cam_all = torch.stack(cam, dim=0)
-        star_id = 0
+        start_id = 0
+
+        if not any(regions_all):
+            print('Catch this case and see what happens. There will be no loss')
+            # Is loss = 0 good or bad for the network? -jer
+            return self.output_loss
 
         # Loop over all regions
         for ri in range(len(regions_all)):
-            regions = regions_all[ri]
-            end_id = star_id + batch_lengths[ri]
-            logits = cam_all[:,star_id:end_id,:]
 
-            # Retrieve ground truth weak labels
-            all_cls_lbs.append(np.stack(regions_lb[ri]).astype('float32'))
+            # Determine batch length to find correct end index
+            end_id = start_id + batch_lengths[ri]
 
-            # Retrieve weak labels based on output logits (predicted)
-            for ii in range(len(regions)):
-                slc_dix = regions[ii].astype('int64') 
-                slc_dix = torch.from_numpy(slc_dix).cuda()
-                assert logits.shape[1] >= torch.max(slc_dix), 'logits problem'
-                averaged_features.append(torch.mean(logits[:,slc_dix,:], dim=1))
+            # Check if the subregion has points (important for active learning) 
+            if regions_all[ri]:
+                regions = regions_all[ri]
+                logits = cam_all[:,start_id:end_id,:]
 
-            star_id = star_id + batch_lengths[ri]
+                # Retrieve ground truth weak labels
+                all_cls_lbs.append(np.stack(regions_lb[ri]).astype('float32'))
+
+                # Retrieve weak labels based on output logits (predicted)
+                for ii in range(len(regions)):
+                    slc_dix = regions[ii].astype('int64') 
+                    slc_dix = torch.from_numpy(slc_dix).cuda()
+                    assert logits.shape[1] >= torch.max(slc_dix), 'logits problem'
+                    averaged_features.append(torch.mean(logits[:,slc_dix,:], dim=1))
+
+            # Update start index for next subregion
+            start_id = start_id + batch_lengths[ri]
         
         # Stack weak labels (ground truth and predicted) and calculate loss
         all_cls_lbs = np.vstack(all_cls_lbs)
