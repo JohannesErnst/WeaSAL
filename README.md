@@ -1,7 +1,7 @@
 # Weakly Supervised Active Learning
-Combination of Weakly Supervised Learning and Active Learning for 3D Point Cloud Classification with Minimum Labeling Effort.
+*WORK IN PROGRESS*
 
-*REPO IS WORK IN PROGRESS*
+Combination of Weakly Supervised Learning and Active Learning for 3D Point Cloud Classification with Minimum Labeling Effort.
 
 ![Overview](https://user-images.githubusercontent.com/51992212/178697796-4d9249c8-599e-4803-9ec8-cb0ae0f163e2.png)
 
@@ -9,7 +9,7 @@ Credit: Lin, Y., G. Vosselman, and M. Y. Yang (2022). "Weakly supervised semanti
 
 
 ## Installation
-Please read the `INSTALL.md` file for installation instructions.
+Will be added in the future (`INSTALL.md`). Please follow the installation instructions for KPConv (PyTorch) for now.
 
 
 ## Overview
