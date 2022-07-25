@@ -756,6 +756,7 @@ class KPFCNN_mprm(nn.Module):
         if not any(regions_all):
             print('Catch this case and see what happens. There will be no loss')
             # Is loss = 0 good or bad for the network? -jer
+            # Right now this cannot happen beacuse the batch is skipped if there is no weak label given
             return self.output_loss
 
         # Loop over all regions

@@ -33,6 +33,7 @@ from torch.utils.data import DataLoader
 # Utils
 from utils.config import Config
 from utils.trainer_WeakLabel import ModelTrainer
+from utils.tester_WeakLabel import ModelTesterWL
 from models.architectures import *
 
 
@@ -86,10 +87,10 @@ class Vaihingen3DWLConfig(Config):
     num_kernel_points = 15
 
     # Radius of the input sphere (decrease value to reduce memory cost)
-    in_radius = 24
+    in_radius = 20      # was 24 -jer
 
     # Radius of the subcloud for weak labels (smaller means more labels but better results)
-    sub_radius = 6
+    sub_radius = 5      # was 6 -jer
 
     # Size of the first subsampling grid in meter (increase value to reduce memory cost)
     first_subsampling_dl = 0.24
@@ -133,7 +134,7 @@ class Vaihingen3DWLConfig(Config):
     #####################
 
     # Maximal number of epochs
-    max_epoch = 80
+    max_epoch = 50 # change back to 50
 
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
@@ -142,13 +143,13 @@ class Vaihingen3DWLConfig(Config):
     grad_clip_norm = 1
 
     # Number of batch (or number of input spheres)
-    batch_num = 4
+    batch_num = 3       # this was 4 but when testing after training we cannot hold so much memory. Maybe we can clear the main part of memory ? -jer
 
     # Number of steps per epochs
-    epoch_steps = 600
+    epoch_steps = 500
 
     # Number of validation examples per epoch
-    validation_size = 50
+    validation_size = 200
 
     # Number of epoch between each checkpoint
     checkpoint_gap = 10
@@ -170,7 +171,10 @@ class Vaihingen3DWLConfig(Config):
     # Other parameters
     model_name = 'KPFCNN_mprm'
     loss_type = 'region_mprm_loss'
-    anchor_method = 'al_100'
+    anchor_method = 'reduced'
+    active_learning_iterations = 5
+    initial_label_count = 100
+    added_labels_per_epoch = int(initial_label_count*0.5)
 
     # Do we nee to save convergence
     saving = True
@@ -239,65 +243,90 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         config.saving_path = sys.argv[1]
 
-    # Initialize datasets
-    training_dataset = Vaihingen3DWLDataset(config, set='training', use_potentials=True)
-    test_dataset = Vaihingen3DWLDataset(config, set='validation', use_potentials=True)
+    # Active learning loop
+    for iteration in range(config.active_learning_iterations + 1):
 
-    # Initialize samplers
-    training_sampler = Vaihingen3DWLSampler(training_dataset)
-    test_sampler = Vaihingen3DWLSampler(test_dataset)
+        # Initialize datasets for training and validation
+        training_dataset = Vaihingen3DWLDataset(config, set='training', use_potentials=True, al_iteration=iteration)
+        validation_dataset = Vaihingen3DWLDataset(config, set='validation', use_potentials=True)
 
-    # Initialize the dataloader
-    training_loader = DataLoader(training_dataset,
+        # Initialize dataset for testing on the training set (test_on_train=True)
+        test_dataset = Vaihingen3DWLDataset(config, set='test', use_potentials=True, test_on_train=True)
+
+        # Initialize samplers
+        training_sampler = Vaihingen3DWLSampler(training_dataset)
+        validation_sampler = Vaihingen3DWLSampler(validation_dataset)
+        test_sampler = Vaihingen3DWLSampler(test_dataset)
+
+        # Initialize the dataloader
+        training_loader = DataLoader(training_dataset,
+                                     batch_size=1,
+                                     sampler=training_sampler,
+                                     collate_fn=Vaihingen3DWLCollate,
+                                     num_workers=config.input_threads,
+                                     pin_memory=True)
+        validation_loader = DataLoader(validation_dataset,
+                                       batch_size=1,
+                                       sampler=validation_sampler,
+                                       collate_fn=Vaihingen3DWLCollate,
+                                       num_workers=config.input_threads,
+                                       pin_memory=True)
+        test_loader = DataLoader(test_dataset,
                                  batch_size=1,
-                                 sampler=training_sampler,
+                                 sampler=test_sampler,
                                  collate_fn=Vaihingen3DWLCollate,
                                  num_workers=config.input_threads,
                                  pin_memory=True)
-    test_loader = DataLoader(test_dataset,
-                             batch_size=1,
-                             sampler=test_sampler,
-                             collate_fn=Vaihingen3DWLCollate,
-                             num_workers=config.input_threads,
-                             pin_memory=True)
 
-    # Calibrate samplers
-    training_sampler.calibration(training_loader, verbose=True)
-    test_sampler.calibration(test_loader, verbose=True)
+        # Calibrate samplers
+        training_sampler.calibration(training_loader, verbose=True)
+        validation_sampler.calibration(validation_loader, verbose=True)
+        test_sampler.calibration(test_loader, verbose=True)
 
-    # Optional debug functions
-    # debug_timing(training_dataset, training_loader)
-    # debug_timing(test_dataset, test_loader)
-    # debug_upsampling(training_dataset, training_loader)
+        # Optional debug functions
+        # debug_timing(training_dataset, training_loader)
+        # debug_timing(validation_dataset, validation_loader)
+        # debug_upsampling(training_dataset, training_loader)
 
-    print('\nModel Preparation')
-    print('*****************')
+        print('\nModel Preparation')
+        print('*****************')
 
-    # Define network model
-    t1 = time.time()
-    net = KPFCNN_mprm(config, training_dataset.label_values, training_dataset.ignored_labels)
-   
-    debug = False
-    if debug:
-        print('\n*************************************\n')
-        print(net)
-        print('\n*************************************\n')
-        for param in net.parameters():
-            if param.requires_grad:
-                print(param.shape)
-        print('\n*************************************\n')
-        print("Model size %i" % sum(param.numel() for param in net.parameters() if param.requires_grad))
-        print('\n*************************************\n')
+        # Define network model
+        t1 = time.time()
+        net = KPFCNN_mprm(config, training_dataset.label_values, training_dataset.ignored_labels)
+    
+        debug = False
+        if debug:
+            print('\n*************************************\n')
+            print(net)
+            print('\n*************************************\n')
+            for param in net.parameters():
+                if param.requires_grad:
+                    print(param.shape)
+            print('\n*************************************\n')
+            print("Model size %i" % sum(param.numel() for param in net.parameters() if param.requires_grad))
+            print('\n*************************************\n')
 
-    # Define a trainer class
-    trainer = ModelTrainer(net, config, chkp_path=chosen_chkp)
-    print('Done in {:.1f}s\n'.format(time.time() - t1))
+        # Define a trainer class
+        trainer = ModelTrainer(net, config, chkp_path=chosen_chkp)
+        print('Done in {:.1f}s\n'.format(time.time() - t1))
 
-    print('\nStart training')
-    print('**************')
+        print('\nStart training')
+        print('**************')
 
-    # Training
-    trainer.train(net, training_loader, test_loader, config)
+        # Training
+        trainer.train(net, training_loader, validation_loader, config, al_iteration=iteration)
+
+        # Test network on training data to get probabilities for active learning
+        # --> Weak label set is extended for the next iteration in cloud_segmentation_test
+        if config.active_learning_iterations:
+            torch.cuda.empty_cache()
+            chosen_chkp = os.path.join(config.saving_path, 'checkpoints/current_chkp.tar')
+            tester = ModelTesterWL(net, chkp_path=chosen_chkp)
+            tester.cloud_segmentation_test(net, test_loader, config, num_votes=10, active_learning=True)
+        
+        # Reset the checkpoint to ensure a new training network for the next iteration
+        chosen_chkp = None
 
     print('Forcing exit now')
     os.kill(os.getpid(), signal.SIGINT)

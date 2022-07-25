@@ -50,7 +50,7 @@ from utils.anchors import *
 class DALESWLDataset(PointCloudDataset):
     """Class to handle DALES dataset with weak region-labels (WL)."""
 
-    def __init__(self, config, set='training', use_potentials=True, load_data=True):
+    def __init__(self, config, set='training', use_potentials=True, load_data=True, test_on_train=False, al_iteration=0):
         """
         This dataset is small enough to be stored in-memory, so load all point clouds here
         """
@@ -130,7 +130,10 @@ class DALESWLDataset(PointCloudDataset):
         self.all_splits = list(range(0,69))
         self.validation_split = list(range(29,58))
         self.test_split = list(range(58,69))
-
+        if not test_on_train:                       # normal test dataset
+            self.test_split = list(range(58,69))
+        else:                                       # for active learning set 'train' as test dataset
+            self.test_split = list(range(0,29))
 
         # Number of models used per epoch
         if self.set == 'training':
@@ -233,6 +236,27 @@ class DALESWLDataset(PointCloudDataset):
                     # Save anchors as pickle file
                     with open(anchors_file, 'wb') as f:
                         pickle.dump([anchor, anchor_tree, anchors_dict, anchor_lb], f)
+
+                # Subsample the weak labels according to the active learning iteration   # test this -jer
+                anchors_subsampled_file = join(self.tree_path, '{:s}_subsampled_anchors.pkl'.format(self.cloud_names[i]))
+                if not al_iteration:
+
+                    # Select a subsample of all weak labels for active learning
+                    anchor, anchor_tree, anchors_dict, anchor_lb, anchor_inds_sub = subsample_anchors(
+                        anchor, anchors_dict, anchor_lb, config.initial_label_count)
+
+                    # Save the indices of the subsampled anchors as pickle file
+                    with open(anchors_subsampled_file, 'wb') as f:
+                        pickle.dump(anchor_inds_sub, f)
+
+                else:
+                    
+                    # Load the index list for weak labels from file
+                    with open(anchors_subsampled_file, 'rb') as f:
+                        anchor_inds_sub = pickle.load(f)
+
+                    # Select the subsample from all weak labels
+                    anchor, anchor_tree, anchors_dict, anchor_lb = select_anchors(anchor, anchors_dict, anchor_lb, anchor_inds_sub)
 
                 # Save anchors of all files in single variables
                 self.anchors += [anchor]

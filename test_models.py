@@ -100,13 +100,13 @@ if __name__ == '__main__':
 
     chosen_log = 'results/WeakLabel/Log_2022-06-28_08-27-45'
     # chosen_log = 'last_DALESPL'
-    chosen_log = 'last_Vaihingen3DPL'
+    chosen_log = 'last_Vaihingen3DWL'
 
     # Choose the index of the checkpoint to load OR None if you want to load the current checkpoint
     chkp_idx = -1
 
     # Choose to test on validation or test split
-    on_val = False
+    on_val = True
 
     # Deal with 'last_XXXXXX' choices
     chosen_log = model_choice(chosen_log)

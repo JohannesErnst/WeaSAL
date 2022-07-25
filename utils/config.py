@@ -279,6 +279,15 @@ class Config:
                 elif line_info[0] == 'anchor_method':
                     setattr(self, line_info[0], line_info[2])
 
+                elif line_info[0] == 'active_learning_iterations':
+                    setattr(self, line_info[0], int(line_info[2]))
+
+                elif line_info[0] == 'initial_label_count':
+                    setattr(self, line_info[0], int(line_info[2]))
+                
+                elif line_info[0] == 'added_labels_per_epoch':
+                    setattr(self, line_info[0], int(line_info[2]))
+
                 elif hasattr(self, line_info[0]):
                     if len(line_info[2].split('.')) == 2:
                         attr_type = type(getattr(self, 'first_subsampling_dl')) # set as float
@@ -413,7 +422,13 @@ class Config:
             if hasattr(self, 'contrast_thd'):
                 text_file.write('contrast_thd[%] = {:.6f}\n'.format(self.contrast_thd))
             if hasattr(self, 'anchor_method'):
-                text_file.write('anchor_method = {:s}\n'.format(self.anchor_method))                   
+                text_file.write('anchor_method = {:s}\n'.format(self.anchor_method))   
+            if hasattr(self, 'active_learning_iterations'):
+                text_file.write('active_learning_iterations = {:d}\n'.format(self.active_learning_iterations))
+            if hasattr(self, 'initial_label_count'):
+                text_file.write('initial_label_count = {:d}\n'.format(self.initial_label_count))
+            if hasattr(self, 'added_labels_per_epoch'):
+                text_file.write('added_labels_per_epoch = {:d}\n'.format(self.added_labels_per_epoch))
             if hasattr(self, 'weak_label_log'):
                 text_file.write('weak_label_log = {:s}\n'.format(self.weak_label_log))
             if hasattr(self, 'dropout'):

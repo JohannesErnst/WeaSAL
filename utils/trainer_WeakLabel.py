@@ -124,7 +124,7 @@ class ModelTrainer:
     # Training main method
     # ------------------------------------------------------------------------------------------------------------------
 
-    def train(self, net, training_loader, val_loader, config):
+    def train(self, net, training_loader, val_loader, config, al_iteration=0):
         """
         Train the model on a particular dataset.
         """
@@ -157,6 +157,7 @@ class ModelTrainer:
         t = [time.time()]
         last_display = time.time()
         mean_dt = np.zeros(1)
+        self.al_iteration = al_iteration
 
         # Start training loop
         for epoch in range(config.max_epoch):
@@ -226,13 +227,14 @@ class ModelTrainer:
                 # Console display (only one per second)
                 if (t[-1] - last_display) > 1.0:
                     last_display = t[-1]
-                    message = 'e{:03d}-i{:04d} => L={:.3f} acc={:3.0f}% / t(ms): {:5.1f} {:5.1f} {:5.1f})'
+                    message = 'e{:03d}-i{:04d} => L={:.3f} acc={:3.0f}% / t(ms): {:5.1f} {:5.1f} {:5.1f}) | al_iteration={:d}'
                     print(message.format(self.epoch, self.step,
                                          loss.item(),
                                          100*acc,
                                          1000 * mean_dt[0],
                                          1000 * mean_dt[1],
-                                         1000 * mean_dt[2]))
+                                         1000 * mean_dt[2],
+                                         self.al_iteration))
 
                 # Log file
                 if config.saving:
@@ -490,7 +492,8 @@ class ModelTrainer:
 
         # Save confusions occasionally
         if config.saving and (self.epoch + 1) % config.checkpoint_gap == 0:
-            val_path = join(config.saving_path, 'val_preds_{:d}'.format(self.epoch + 1))
+            # val_path = join(config.saving_path, 'val_preds_{:d}'.format(self.epoch + 1)) # include al_iteration here and test tihs -jer
+            val_path = join(config.saving_path, 'val_preds_{:d}_{:d}'.format(self.epoch + 1, self.al_iteration))   
             if not exists(val_path):
                 makedirs(val_path)
             files = val_loader.dataset.files

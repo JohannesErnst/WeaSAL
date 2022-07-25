@@ -64,19 +64,10 @@ def get_anchors(points, sub_radius, method='full'):
                     n_anchors.append([x, y, z])
                     n_anchors.append([x, y, z + sub_radius])
                     n_anchors.append([x + sub_radius, y + sub_radius, z])
-                    n_anchors.append([x + sub_radius, y + sub_radius, z + sub_radius])
+                    n_anchors.append([x + sub_radius, y + sub_radius, z + sub_radius])     
 
-    if method == 'al_100':
-        # This method uses approimately 100 anchors with linear spacing 
-        # --> for Vaihingen3D active learning
-        x_num = np.linspace(x_min, x_max, 12)
-        y_num = np.linspace(y_min, y_max, 12)
-        z_num = np.linspace(z_min, z_max, 4)
-        for x in x_num:
-            for y in y_num:
-                for z in z_num:
-                    n_anchors.append([x, y, z])
-                 
+    else:
+        raise ValueError('Unsupported method (' + method + ') for creating anchor points')
                     
     return np.array(n_anchors)
 
@@ -149,3 +140,36 @@ def update_anchors(input_tree, clean_anchors, anchor_tree, anchors_dict, anchor_
     print('Anchors considering overlaps: {:.0f}\n'.format(cc))
     anchor_tree = KDTree(clean_anchors, leaf_size=10)
     return clean_anchors, anchor_tree, anchors_dict, anchor_lbs
+
+def select_anchors(anchor, anchors_dict, anchor_lb, anchor_inds_sub):
+    """
+    Function selects only the anchors (i.e. subregions) that are given as 
+    indices in anchor_inds_sub. The indices are based on the full anchor set.
+    """
+
+    # Use indices to reduce the anchor variables
+    anchor_sub = anchor[anchor_inds_sub]
+    anchors_dict_sub = dict()
+    anchor_lb_sub = dict()
+    for idx, anchor_ind in enumerate(anchor_inds_sub):
+        anchors_dict_sub[idx] = anchors_dict[anchor_ind]
+        anchor_lb_sub[idx] = anchor_lb[anchor_ind]
+    anchor_tree_sub = KDTree(anchor_sub, leaf_size=10)
+
+    return anchor_sub, anchor_tree_sub, anchors_dict_sub, anchor_lb_sub
+
+def subsample_anchors(anchor, anchors_dict, anchor_lb, anchor_count):
+    """
+    Function subsamples anchors (i.e. subregions) for active learning to a given
+    amount and returns the updated anchor variables as well as a list with the 
+    indices of the subsampled anchors. The indices are based on the full anchor set.
+    """
+
+    # Linearly subsample the available anchors and save the remaining indices
+    anchor_inds_sub = np.round(np.linspace(0, anchor.shape[0]-1, anchor_count)).astype(int)
+
+    # Use indices to reduce the anchor variables
+    anchor_sub, anchor_tree_sub, anchors_dict_sub, anchor_lb_sub = select_anchors(
+        anchor, anchors_dict, anchor_lb, anchor_inds_sub)
+
+    return anchor_sub, anchor_tree_sub, anchors_dict_sub, anchor_lb_sub, anchor_inds_sub
