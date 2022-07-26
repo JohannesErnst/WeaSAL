@@ -217,7 +217,7 @@ class DALESWLDataset(PointCloudDataset):
 
                 # Check if anchors have already been computed
                 if exists(anchors_file):
-                    print('Found anchors for cloud {:s}, subsampled at {:.3f}'.format(self.cloud_names[i], self.config.first_subsampling_dl))
+                    print('Found anchors for cloud {:s}, subsampled at {:.3f}\n'.format(self.cloud_names[i], self.config.first_subsampling_dl))
                     
                     # Read pkl to get anchors
                     with open(anchors_file, 'rb') as f:
@@ -229,15 +229,15 @@ class DALESWLDataset(PointCloudDataset):
                     anchor, anchor_tree, anchors_dict, anchor_lb = anchors_with_points(
                         tree, anchor, self.input_labels[i], config.sub_radius, config.num_classes)
 
-                    # Update subregion information according to overlaps
-                    anchor, anchor_tree, anchors_dict, anchor_lb = update_anchors(
-                        tree, anchor, anchor_tree, anchors_dict, anchor_lb, config.sub_radius)
+                    # # Update subregion information according to overlaps                      # Switch this back in once everything runs. But think about what that means for active learning -jer
+                    # anchor, anchor_tree, anchors_dict, anchor_lb = update_anchors(
+                    #     tree, anchor, anchor_tree, anchors_dict, anchor_lb, config.sub_radius)
 
                     # Save anchors as pickle file
                     with open(anchors_file, 'wb') as f:
                         pickle.dump([anchor, anchor_tree, anchors_dict, anchor_lb], f)
 
-                # Subsample the weak labels according to the active learning iteration   # test this -jer
+                # Subsample the weak labels according to the active learning iteration
                 anchors_subsampled_file = join(self.tree_path, '{:s}_subsampled_anchors.pkl'.format(self.cloud_names[i]))
                 if not al_iteration:
 
@@ -437,13 +437,14 @@ class DALESWLDataset(PointCloudDataset):
                 region_lb = []
                 for aa in range(pot_anchor_inds[0].shape[0]):   # for all neighbouring anchors
                     pot_ans_idx = pot_anchor_inds[0][aa]        # get anchor id
-                    idx_r = pot_anchor_dict[pot_ans_idx][0][0]  # get corresponding points id
+                    idx_r = pot_anchor_dict[pot_ans_idx][0][0]  # get corresponding point ids
                     y = idx_r[np.in1d(idx_r,input_inds)]        # filter out points that are in subregion but not input region
                     ii_sorted = np.argsort(input_inds)          # sorted input indices
                     ypos = np.searchsorted(input_inds[ii_sorted], y)
                     idx = ii_sorted[ypos]                       # indices of subregion points in original point cloud
-                    region_idx.append(idx)
-                    region_lb.append(pot_anchor_lb[pot_ans_idx]) # weak labels based on sub_radius
+                    if idx.any():                               # check if indices exist
+                        region_idx.append(idx)                          # save the indices
+                        region_lb.append(pot_anchor_lb[pot_ans_idx])    # weak labels based on sub_radius
 
             t += [time.time()]
 

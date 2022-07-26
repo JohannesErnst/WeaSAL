@@ -753,12 +753,6 @@ class KPFCNN_mprm(nn.Module):
         cam_all = torch.stack(cam, dim=0)
         start_id = 0
 
-        if not any(regions_all):
-            print('Catch this case and see what happens. There will be no loss')
-            # Is loss = 0 good or bad for the network? -jer
-            # Right now this cannot happen beacuse the batch is skipped if there is no weak label given
-            return self.output_loss
-
         # Loop over all regions
         for ri in range(len(regions_all)):
 

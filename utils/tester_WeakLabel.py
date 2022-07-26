@@ -399,15 +399,17 @@ class ModelTesterWL:
                         t2 = time.time()
                         print('Done in {:.1f} s\n'.format(t2 - t1))
 
-                    # Active learning case: Find anchors with low probability (insecure predictions) 
-                    # to add weak labels in next iteration
+                    # Active learning case: Find anchors with high entropy sampling score 
+                    # (= insecure predictions) to add weak labels in next iteration
                     else:
 
                         # Loop over all training files
                         for i, file_path in enumerate(test_loader.dataset.cloud_names):
 
-                            # Get the probabilites for all points in the subsampled cloud
-                            cloud_probs = np.max(all_pseduo_probs[file_path+'.ply'], axis=1)
+                            # Get the entropy sampling score for all points in the subsampled cloud
+                            # (+1e-12 is added to handle logarithm of probability = 0)
+                            entropy_scores = -np.sum(all_pseduo_probs[file_path+'.ply'] * 
+                                                     np.log2(all_pseduo_probs[file_path+'.ply']+1e-12), axis=1)
 
                             # Define path to the anchors file for the subsampled cloud
                             anchors_file = join(test_loader.dataset.tree_path, '{:s}_anchors_{:s}.pkl'.format(
@@ -417,21 +419,21 @@ class ModelTesterWL:
                             with open(anchors_file, 'rb') as f:
                                 anchor, anchor_tree, anchors_dict, anchor_lb = pickle.load(f)
 
-                            # Loop over all anchors to get the average probability
-                            anchor_avg_prob = np.zeros(len(anchors_dict)).astype(np.float32)
+                            # Loop over all anchors to get the average entropy sampling score
+                            anchor_avg_score = np.zeros(len(anchors_dict)).astype(np.float32)
                             for anchor in anchors_dict:
 
                                 # Find the indices (for the subsampled cloud) of the points in the anchor
                                 anchor_point_ids = np.squeeze(anchors_dict[anchor][0])
 
-                                # Grab the probabilities for the points in the anchor
-                                anchor_probs = cloud_probs[anchor_point_ids]
+                                # Grab the entropy sampling scores for the points in the anchor
+                                anchor_scores = entropy_scores[anchor_point_ids]
 
-                                # Calcualte the average probability for the anchor and save
-                                anchor_avg_prob[anchor] = np.mean(anchor_probs)
+                                # Calcualte the average entropy sampling score for the anchor and save
+                                anchor_avg_score[anchor] = np.mean(anchor_scores)
 
-                            # Sort the anchors according to their probability (ascending) and save indices
-                            sort_ids = np.argsort(anchor_avg_prob)
+                            # Sort anchors according to their entropy sampling score (descending) and save indices
+                            sort_ids = np.argsort(-anchor_avg_score)
 
                             # Load the indices of the anchors of the previous iteration
                             anchors_subsampled_file = join(test_loader.dataset.tree_path, '{:s}_subsampled_anchors.pkl'.format(file_path))
@@ -442,14 +444,14 @@ class ModelTesterWL:
                             for used_anchor in anchor_inds_sub:
                                 sort_ids = np.delete(sort_ids, np.where(sort_ids == used_anchor))
 
-                            # Select the anchor indices with the lowest probability
+                            # Select the anchor indices with the highest entropy sampling score
                             if len(sort_ids) > test_loader.dataset.config.added_labels_per_epoch:
-                                low_prob_ids = sort_ids[0:test_loader.dataset.config.added_labels_per_epoch]
+                                high_score_ids = sort_ids[0:test_loader.dataset.config.added_labels_per_epoch]
                             else:
                                 raise ValueError('Not enough weak labels left for the next iteration')
 
-                            # Add the low probability anchor ids to the index list
-                            anchor_inds_sub = np.append(anchor_inds_sub, low_prob_ids)
+                            # Add the high entropy sampling score anchor ids to the index list
+                            anchor_inds_sub = np.append(anchor_inds_sub, high_score_ids)
 
                             # Save the updated indices of the subsampled anchors as pickle file
                             with open(anchors_subsampled_file, 'wb') as f:

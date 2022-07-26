@@ -168,13 +168,15 @@ class Vaihingen3DWLConfig(Config):
     # Enable dropout
     dropout = 0.5
 
+    # Active learning parameters
+    active_learning_iterations = 5
+    initial_label_count = 100   # weak label count per input file
+    added_labels_per_epoch = int(initial_label_count*0.5)
+
     # Other parameters
     model_name = 'KPFCNN_mprm'
     loss_type = 'region_mprm_loss'
     anchor_method = 'reduced'
-    active_learning_iterations = 5
-    initial_label_count = 100
-    added_labels_per_epoch = int(initial_label_count*0.5)
 
     # Do we nee to save convergence
     saving = True
@@ -317,9 +319,15 @@ if __name__ == '__main__':
         # Training
         trainer.train(net, training_loader, validation_loader, config, al_iteration=iteration)
 
+        # Print amount of used weak labels
+        anchor_num = np.sum([len(f) for f in training_dataset.anchors])
+        print('\n*************************************')
+        print('Amount of weak labels:  {:d}'.format(anchor_num))
+        print('*************************************\n')
+
         # Test network on training data to get probabilities for active learning
         # --> Weak label set is extended for the next iteration in cloud_segmentation_test
-        if config.active_learning_iterations:
+        if config.active_learning_iterations and not iteration == config.active_learning_iterations:
             torch.cuda.empty_cache()
             chosen_chkp = os.path.join(config.saving_path, 'checkpoints/current_chkp.tar')
             tester = ModelTesterWL(net, chkp_path=chosen_chkp)

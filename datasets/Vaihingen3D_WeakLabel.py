@@ -198,7 +198,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 
                 # Check if anchors have already been computed
                 if exists(anchors_file):
-                    print('Found anchors for cloud {:s}, subsampled at {:.3f}'.format(self.cloud_names[i], self.config.first_subsampling_dl))
+                    print('Found anchors for cloud {:s}, subsampled at {:.3f}\n'.format(self.cloud_names[i], self.config.first_subsampling_dl))
                     
                     # Read pkl to get anchors
                     with open(anchors_file, 'rb') as f:
@@ -210,9 +210,9 @@ class Vaihingen3DWLDataset(PointCloudDataset):
                     anchor, anchor_tree, anchors_dict, anchor_lb = anchors_with_points(
                         tree, anchor, self.input_labels[i], config.sub_radius, config.num_classes)
 
-                    # Update subregion information according to overlaps
-                    anchor, anchor_tree, anchors_dict, anchor_lb = update_anchors(
-                        tree, anchor, anchor_tree, anchors_dict, anchor_lb, config.sub_radius)
+                    # # Update subregion information according to overlaps                      # Switch this back in once everything runs. But think about what that means for active learning -jer
+                    # anchor, anchor_tree, anchors_dict, anchor_lb = update_anchors(
+                    #     tree, anchor, anchor_tree, anchors_dict, anchor_lb, config.sub_radius)
                     
                     # Save the anchors as point cloud for visualization
                     anchor_file_name = anchors_file[:-4]
@@ -422,13 +422,16 @@ class Vaihingen3DWLDataset(PointCloudDataset):
                 region_lb = []
                 for aa in range(pot_anchor_inds[0].shape[0]):   # for all neighbouring anchors
                     pot_ans_idx = pot_anchor_inds[0][aa]        # get anchor id
-                    idx_r = pot_anchor_dict[pot_ans_idx][0][0]  # get corresponding points id
+                    idx_r = pot_anchor_dict[pot_ans_idx][0][0]  # get corresponding point ids
                     y = idx_r[np.in1d(idx_r,input_inds)]        # filter out points that are in subregion but not input region
                     ii_sorted = np.argsort(input_inds)          # sorted input indices
                     ypos = np.searchsorted(input_inds[ii_sorted], y)
                     idx = ii_sorted[ypos]                       # indices of subregion points in original point cloud
-                    region_idx.append(idx)
-                    region_lb.append(pot_anchor_lb[pot_ans_idx]) # weak labels based on sub_radius
+                    if idx.any():                               # check if indices exist
+                        region_idx.append(idx)                          # save the indices
+                        region_lb.append(pot_anchor_lb[pot_ans_idx])    # weak labels based on sub_radius
+                    else:
+                        stopandtest = 0         # delete this here -jer
 
             t += [time.time()]
 

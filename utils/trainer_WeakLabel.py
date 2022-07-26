@@ -170,8 +170,7 @@ class ModelTrainer:
             for batch in training_loader:
 
                 # Check if batch contains no subregion labels
-                # In this case we cannot calculate loss
-                # Is this the best option to just skip the batch? -jer
+                # In this case we cannot calculate loss --> Skip batch
                 if not any(batch.region):
                     continue
 
@@ -492,8 +491,7 @@ class ModelTrainer:
 
         # Save confusions occasionally
         if config.saving and (self.epoch + 1) % config.checkpoint_gap == 0:
-            # val_path = join(config.saving_path, 'val_preds_{:d}'.format(self.epoch + 1)) # include al_iteration here and test tihs -jer
-            val_path = join(config.saving_path, 'val_preds_{:d}_{:d}'.format(self.epoch + 1, self.al_iteration))   
+            val_path = join(config.saving_path, 'val_preds_{:d}_{:d}'.format(self.al_iteration, self.epoch + 1))   
             if not exists(val_path):
                 makedirs(val_path)
             files = val_loader.dataset.files
