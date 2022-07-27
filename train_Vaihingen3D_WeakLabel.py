@@ -170,8 +170,8 @@ class Vaihingen3DWLConfig(Config):
 
     # Active learning parameters
     active_learning_iterations = 5
-    initial_label_count = 100   # weak label count per input file
-    added_labels_per_epoch = int(initial_label_count*0.5)
+    initial_labels_per_file = 100
+    added_labels_per_epoch = int(initial_labels_per_file*0.5)
 
     # Other parameters
     model_name = 'KPFCNN_mprm'

@@ -134,7 +134,7 @@ class DALESWLConfig(Config):
     #####################
 
     # Maximal number of epochs
-    max_epoch = 70
+    max_epoch = 60
 
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
@@ -149,7 +149,7 @@ class DALESWLConfig(Config):
     epoch_steps = 300
 
     # Number of validation examples per epoch
-    validation_size = 300
+    validation_size = 200
 
     # Number of epoch between each checkpoint
     checkpoint_gap = 20
@@ -169,9 +169,9 @@ class DALESWLConfig(Config):
     dropout = 0.5
 
     # Active learning parameters
-    active_learning_iterations = 5
-    initial_label_count = 100
-    added_labels_per_epoch = int(initial_label_count*0.5)
+    active_learning_iterations = 3
+    initial_labels_per_file = 100
+    added_labels_per_epoch = int(initial_labels_per_file*0.5)
 
     # Other parameters
     model_name = 'KPFCNN_mprm'
@@ -317,7 +317,7 @@ if __name__ == '__main__':
         print('**************')
 
         # Training
-        trainer.train(net, training_loader, test_loader, config, al_iteration=iteration)
+        trainer.train(net, training_loader, validation_loader, config, al_iteration=iteration)
 
         # Print amount of used weak labels
         anchor_num = np.sum([len(f) for f in training_dataset.anchors])

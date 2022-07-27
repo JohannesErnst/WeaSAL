@@ -115,25 +115,16 @@ class DALESWLDataset(PointCloudDataset):
                             '5150_54340','5160_54330','5165_54390','5165_54395',
                             '5180_54435','5180_54485','5185_54390','5185_54485',
                             '5190_54400',
-                            '5080_54435','5085_54320','5095_54440','5095_54455',
-                            '5100_54495','5105_54405','5105_54460','5110_54320',
-                            '5110_54460','5110_54475','5110_54495','5115_54480',
-                            '5130_54355','5135_54495','5140_54445','5145_54340',
-                            '5145_54405','5145_54460','5145_54470','5145_54480',
-                            '5150_54340','5160_54330','5165_54390','5165_54395',
-                            '5180_54435','5180_54485','5185_54390','5185_54485',
-                            '5190_54400',
                             'test_5080_54400','test_5080_54470','test_5100_54440',
                             'test_5100_54490','test_5120_54445','test_5135_54430',
                             'test_5135_54435','test_5140_54390','test_5150_54325',
                             'test_5155_54335','test_5175_54395']
-        self.all_splits = list(range(0,69))
-        self.validation_split = list(range(29,58))
-        self.test_split = list(range(58,69))
+        self.all_splits = list(range(0,40))
+        self.validation_split = 28
         if not test_on_train:                       # normal test dataset
-            self.test_split = list(range(58,69))
+            self.test_split = list(range(29,40))
         else:                                       # for active learning set 'train' as test dataset
-            self.test_split = list(range(0,29))
+            self.test_split = list(range(0,28))
 
         # Number of models used per epoch
         if self.set == 'training':
@@ -161,26 +152,26 @@ class DALESWLDataset(PointCloudDataset):
         self.files = []
         for i, f in enumerate(self.cloud_names):
             if self.set == 'training':
-                if self.all_splits[i] not in self.validation_split and self.all_splits[i] not in self.test_split:
+                if self.all_splits[i] != self.validation_split and self.all_splits[i] not in self.test_split:
                     self.files += [join(ply_path, f + '.ply')]
             elif self.set == 'test':
                 if self.all_splits[i] in self.test_split:
                     self.files += [join(ply_path, f + '.ply')]
             elif self.set in ['validation', 'ERF']:
-                if self.all_splits[i] in self.validation_split:
+                if self.all_splits[i] == self.validation_split:
                     self.files += [join(ply_path, f + '.ply')]
             else:
                 raise ValueError('Unknown set for DALESWL data: ', self.set)
 
         if self.set == 'training':
             self.cloud_names = [f for i, f in enumerate(self.cloud_names)
-                                if self.all_splits[i] not in self.validation_split and self.all_splits[i] not in self.test_split]
+                                if self.all_splits[i] != self.validation_split and self.all_splits[i] not in self.test_split]
         elif self.set == 'test':
             self.cloud_names = [f for i, f in enumerate(self.cloud_names)
                                 if self.all_splits[i] in self.test_split]
         elif self.set in ['validation', 'ERF']:
             self.cloud_names = [f for i, f in enumerate(self.cloud_names)
-                                if self.all_splits[i] in self.validation_split]
+                                if self.all_splits[i] == self.validation_split]
 
         if 0 < self.config.first_subsampling_dl <= 0.01:
             raise ValueError('subsampling_parameter too low (should be over 1 cm')
@@ -243,7 +234,7 @@ class DALESWLDataset(PointCloudDataset):
 
                     # Select a subsample of all weak labels for active learning
                     anchor, anchor_tree, anchors_dict, anchor_lb, anchor_inds_sub = subsample_anchors(
-                        anchor, anchors_dict, anchor_lb, config.initial_label_count)
+                        anchor, anchors_dict, anchor_lb, config.initial_labels_per_file)
 
                     # Save the indices of the subsampled anchors as pickle file
                     with open(anchors_subsampled_file, 'wb') as f:

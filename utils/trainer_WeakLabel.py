@@ -135,8 +135,9 @@ class ModelTrainer:
 
         if config.saving:
             # Training log file
-            with open(join(config.saving_path, 'training.txt'), "w") as file:
-                file.write('epochs steps out_loss offset_loss train_accuracy time\n')
+            with open(join(config.saving_path, 'training_iteration' + str(al_iteration) + '.txt'), "w") as file:
+                anchor_num = np.sum([len(f) for f in training_loader.dataset.anchors])
+                file.write('epochs steps out_loss offset_loss train_accuracy time \tweak labels: ' + str(anchor_num) + '\n')
 
             # Killing file (simply delete this file when you want to stop the training)
             PID_file = join(config.saving_path, 'running_PID.txt')
@@ -237,7 +238,7 @@ class ModelTrainer:
 
                 # Log file
                 if config.saving:
-                    with open(join(config.saving_path, 'training.txt'), "a") as file:
+                    with open(join(config.saving_path, 'training_iteration' + str(al_iteration) + '.txt'), "a") as file:
                         message = '{:d} {:d} {:.3f} {:.3f} {:.3f} {:.3f}\n'
                         file.write(message.format(self.epoch,
                                                   self.step,

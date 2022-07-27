@@ -123,6 +123,9 @@ def load_confusions(filename, n_class):
 
 def load_training_results(path):
 
+    # modify here -jer
+    # if exists training.txt do normal
+    # else list the training_iterationX.txt
     filename = join(path, 'training.txt')
     with open(filename, 'r') as f:
         lines = f.readlines()
@@ -483,242 +486,6 @@ def compare_convergences_segment(dataset, list_of_paths, list_of_names=None):
     plt.show()
 
 
-def compare_convergences_classif(list_of_paths, list_of_labels=None):
-
-    # Parameters
-    # **********
-
-    steps_per_epoch = 0
-    smooth_n = 12
-
-    if list_of_labels is None:
-        list_of_labels = [str(i) for i in range(len(list_of_paths))]
-
-    # Read Logs
-    # *********
-
-    all_pred_epochs = []
-    all_val_OA = []
-    all_train_OA = []
-    all_vote_OA = []
-    all_vote_confs = []
-
-
-    for path in list_of_paths:
-
-        # Load parameters
-        config = Config()
-        config.load(list_of_paths[0])
-
-        # Get the number of classes
-        n_class = config.num_classes
-
-        # Load epochs
-        epochs, _, _, _, _, _ = load_training_results(path)
-        first_e = np.min(epochs)
-
-        # Get validation confusions
-        file = join(path, 'val_confs.txt')
-        val_C1 = load_confusions(file, n_class)
-        val_PRE, val_REC, val_F1, val_IoU, val_ACC = smooth_metrics(val_C1, smooth_n=smooth_n)
-
-        # Get vote confusions
-        file = join(path, 'vote_confs.txt')
-        if exists(file):
-            vote_C2 = load_confusions(file, n_class)
-            vote_PRE, vote_REC, vote_F1, vote_IoU, vote_ACC = smooth_metrics(vote_C2, smooth_n=2)
-        else:
-            vote_C2 = val_C1
-            vote_PRE, vote_REC, vote_F1, vote_IoU, vote_ACC = (val_PRE, val_REC, val_F1, val_IoU, val_ACC)
-
-        # Aggregate results
-        all_pred_epochs += [np.array([i+first_e for i in range(len(val_ACC))])]
-        all_val_OA += [val_ACC]
-        all_vote_OA += [vote_ACC]
-        all_vote_confs += [vote_C2]
-
-    print()
-
-    # Best scores
-    # ***********
-
-    for i, label in enumerate(list_of_labels):
-
-        print('\n' + label + '\n' + '*' * len(label) + '\n')
-        print(list_of_paths[i])
-
-        best_epoch = np.argmax(all_vote_OA[i])
-        print('Best Accuracy : {:.1f} % (epoch {:d})'.format(100 * all_vote_OA[i][best_epoch], best_epoch))
-
-        confs = all_vote_confs[i]
-
-        """
-        s = ''
-        for cc in confs[best_epoch]:
-            for c in cc:
-                s += '{:.0f} '.format(c)
-            s += '\n'
-        print(s)
-        """
-
-        TP_plus_FN = np.sum(confs, axis=-1, keepdims=True)
-        class_avg_confs = confs.astype(np.float32) / TP_plus_FN.astype(np.float32)
-        diags = np.diagonal(class_avg_confs, axis1=-2, axis2=-1)
-        class_avg_ACC = np.sum(diags, axis=-1) / np.sum(class_avg_confs, axis=(-1, -2))
-
-        print('Corresponding mAcc : {:.1f} %'.format(100 * class_avg_ACC[best_epoch]))
-
-    # Plots
-    # *****
-
-    for fig_name, OA in zip(['Validation', 'Vote'], [all_val_OA, all_vote_OA]):
-
-        # Figure
-        fig = plt.figure(fig_name)
-        for i, label in enumerate(list_of_labels):
-            plt.plot(all_pred_epochs[i], OA[i], linewidth=1, label=label)
-        plt.xlabel('epochs')
-        plt.ylabel(fig_name + ' Accuracy')
-
-        # Set limits for y axis
-        #plt.ylim(0.55, 0.95)
-
-        # Display legends and title
-        plt.legend(loc=4)
-
-        # Customize the graph
-        ax = fig.gca()
-        ax.grid(linestyle='-.', which='both')
-        #ax.set_yticks(np.arange(0.8, 1.02, 0.02))
-
-    #for i, label in enumerate(list_of_labels):
-    #    print(label, np.max(all_train_OA[i]), np.max(all_val_OA[i]))
-
-    # Show all
-    plt.show()
-
-
-def compare_convergences_SLAM(dataset, list_of_paths, list_of_names=None):
-
-    # Parameters
-    # **********
-
-    smooth_n = 10
-
-    if list_of_names is None:
-        list_of_names = [str(i) for i in range(len(list_of_paths))]
-
-    # Read Logs
-    # *********
-
-    all_pred_epochs = []
-    all_val_mIoUs = []
-    all_val_class_IoUs = []
-    all_subpart_mIoUs = []
-    all_subpart_class_IoUs = []
-
-    # Load parameters
-    config = Config()
-    config.load(list_of_paths[0])
-
-    class_list = [dataset.label_to_names[label] for label in dataset.label_values
-                  if label not in dataset.ignored_labels]
-
-    s = '{:^6}|'.format('mean')
-    for c in class_list:
-        s += '{:^6}'.format(c[:4])
-    print(s)
-    print(6*'-' + '|' + 6*config.num_classes*'-')
-    for path in list_of_paths:
-
-        # Get validation IoUs
-        nc_model = dataset.num_classes - len(dataset.ignored_labels)
-        file = join(path, 'val_IoUs.txt')
-        val_IoUs = load_single_IoU(file, nc_model)
-
-        # Get Subpart IoUs
-        file = join(path, 'subpart_IoUs.txt')
-        subpart_IoUs = load_single_IoU(file, nc_model)
-
-        # Get mean IoU
-        val_class_IoUs, val_mIoUs = IoU_class_metrics(val_IoUs, smooth_n)
-        subpart_class_IoUs, subpart_mIoUs = IoU_class_metrics(subpart_IoUs, smooth_n)
-
-        # Aggregate results
-        all_pred_epochs += [np.array([i for i in range(len(val_IoUs))])]
-        all_val_mIoUs += [val_mIoUs]
-        all_val_class_IoUs += [val_class_IoUs]
-        all_subpart_mIoUs += [subpart_mIoUs]
-        all_subpart_class_IoUs += [subpart_class_IoUs]
-
-        s = '{:^6.1f}|'.format(100*subpart_mIoUs[-1])
-        for IoU in subpart_class_IoUs[-1]:
-            s += '{:^6.1f}'.format(100*IoU)
-        print(s)
-
-    print(6*'-' + '|' + 6*config.num_classes*'-')
-    for snap_IoUs in all_val_class_IoUs:
-        if len(snap_IoUs) > 0:
-            s = '{:^6.1f}|'.format(100*np.mean(snap_IoUs[-1]))
-            for IoU in snap_IoUs[-1]:
-                s += '{:^6.1f}'.format(100*IoU)
-        else:
-            s = '{:^6s}'.format('-')
-            for _ in range(config.num_classes):
-                s += '{:^6s}'.format('-')
-        print(s)
-
-    # Plots
-    # *****
-
-    # Figure
-    fig = plt.figure('mIoUs')
-    for i, name in enumerate(list_of_names):
-        p = plt.plot(all_pred_epochs[i], all_subpart_mIoUs[i], '--', linewidth=1, label=name)
-        plt.plot(all_pred_epochs[i], all_val_mIoUs[i], linewidth=1, color=p[-1].get_color())
-    plt.xlabel('epochs')
-    plt.ylabel('IoU')
-
-    # Set limits for y axis
-    #plt.ylim(0.55, 0.95)
-
-    # Display legends and title
-    plt.legend(loc=4)
-
-    # Customize the graph
-    ax = fig.gca()
-    ax.grid(linestyle='-.', which='both')
-    #ax.set_yticks(np.arange(0.8, 1.02, 0.02))
-
-    displayed_classes = [0, 1, 2, 3, 4, 5, 6, 7]
-    #displayed_classes = []
-    for c_i, c_name in enumerate(class_list):
-        if c_i in displayed_classes:
-
-            # Figure
-            fig = plt.figure(c_name + ' IoU')
-            for i, name in enumerate(list_of_names):
-                plt.plot(all_pred_epochs[i], all_val_class_IoUs[i][:, c_i], linewidth=1, label=name)
-            plt.xlabel('epochs')
-            plt.ylabel('IoU')
-
-            # Set limits for y axis
-            #plt.ylim(0.8, 1)
-
-            # Display legends and title
-            plt.legend(loc=4)
-
-            # Customize the graph
-            ax = fig.gca()
-            ax.grid(linestyle='-.', which='both')
-            #ax.set_yticks(np.arange(0.8, 1.02, 0.02))
-
-
-
-    # Show all
-    plt.show()
-
-
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #           Experiments
@@ -726,7 +493,7 @@ def compare_convergences_SLAM(dataset, list_of_paths, list_of_names=None):
 #
 
 
-def experiment_name_1():
+def experiment_training_compare():
     """
     In this function you choose the results you want to plot together, to compare them as an experiment.
     Just return the list of log paths (like 'results/WeakLabel/Log_2020-04-04_10-04-42' for example), and the associated names
@@ -735,8 +502,38 @@ def experiment_name_1():
     """
 
     # Using the dates of the logs, you can easily gather consecutive ones. All logs should be of the same dataset.
-    start = 'Log_2022-07-15_11-28-45'
-    end = 'Log_2023-07-15_11-28-45'
+    start = 'Log_2022-07-26_12-50-25'
+    end = 'Log_2022-07-26_12-50-25'
+
+    # Name of the result path (either WeakLabel or PseudoLabel)
+    res_path = 'results/WeakLabel'
+    # res_path = 'results/PseudoLabel'
+
+    # Gather logs and sort by date
+    logs = np.sort([join(res_path, l) for l in listdir_str(res_path) if start <= l <= end])
+
+    # Give names to the logs (for plot legends)
+    logs_names = ['V3D WL baseline',
+                  'no ele',
+                  'high augment',
+                  'low augment']
+
+    # safe check log names
+    logs_names = np.array(logs_names[:len(logs)])
+
+    return logs, logs_names
+
+def experiment_active_learning_compare():
+    """
+    In this function you choose the active learning log you want to compare between iterations.
+    Just return the log path (like 'results/WeakLabel/Log_2020-04-04_10-04-42' for example) you want to compare.
+    """
+
+    # Adapt this! -jer
+
+    # Using the dates of the logs, you can easily gather consecutive ones. All logs should be of the same dataset.
+    start = 'Log_2022-07-26_12-50-25'
+    end = 'Log_2022-07-26_12-50-25'
 
     # Name of the result path (either WeakLabel or PseudoLabel)
     res_path = 'results/WeakLabel'
@@ -757,7 +554,7 @@ def experiment_name_1():
     return logs, logs_names
 
 
-def experiment_name_2():
+def experiment_template():
     """
     In this function you choose the results you want to plot together, to compare them as an experiment.
     Just return the list of log paths (like 'results/WeakLabel/Log_2020-04-04_10-04-42' for example), and the associated names
@@ -805,7 +602,7 @@ if __name__ == '__main__':
     ######################################################
 
     # My logs: choose the logs to show
-    logs, logs_names = experiment_name_1()
+    logs, logs_names = experiment_training_compare()
 
     ################
     # Plot functions

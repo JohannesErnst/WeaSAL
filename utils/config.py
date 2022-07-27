@@ -282,7 +282,7 @@ class Config:
                 elif line_info[0] == 'active_learning_iterations':
                     setattr(self, line_info[0], int(line_info[2]))
 
-                elif line_info[0] == 'initial_label_count':
+                elif line_info[0] == 'initial_labels_per_file':
                     setattr(self, line_info[0], int(line_info[2]))
                 
                 elif line_info[0] == 'added_labels_per_epoch':
@@ -425,8 +425,8 @@ class Config:
                 text_file.write('anchor_method = {:s}\n'.format(self.anchor_method))   
             if hasattr(self, 'active_learning_iterations'):
                 text_file.write('active_learning_iterations = {:d}\n'.format(self.active_learning_iterations))
-            if hasattr(self, 'initial_label_count'):
-                text_file.write('initial_label_count = {:d}\n'.format(self.initial_label_count))
+            if hasattr(self, 'initial_labels_per_file'):
+                text_file.write('initial_labels_per_file = {:d}\n'.format(self.initial_labels_per_file))
             if hasattr(self, 'added_labels_per_epoch'):
                 text_file.write('added_labels_per_epoch = {:d}\n'.format(self.added_labels_per_epoch))
             if hasattr(self, 'weak_label_log'):
