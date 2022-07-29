@@ -282,6 +282,9 @@ class Config:
                 elif line_info[0] == 'active_learning_iterations':
                     setattr(self, line_info[0], int(line_info[2]))
 
+                elif line_info[0] == 'subsample_labels':        # test this -jer
+                    setattr(self, line_info[0], bool(line_info[2]))
+
                 elif line_info[0] == 'initial_labels_per_file':
                     setattr(self, line_info[0], int(line_info[2]))
                 
@@ -425,6 +428,8 @@ class Config:
                 text_file.write('anchor_method = {:s}\n'.format(self.anchor_method))   
             if hasattr(self, 'active_learning_iterations'):
                 text_file.write('active_learning_iterations = {:d}\n'.format(self.active_learning_iterations))
+            if hasattr(self, 'subsample_labels'):
+                text_file.write('subsample_labels = {:d}\n'.format(int(self.subsample_labels)))
             if hasattr(self, 'initial_labels_per_file'):
                 text_file.write('initial_labels_per_file = {:d}\n'.format(self.initial_labels_per_file))
             if hasattr(self, 'added_labels_per_epoch'):

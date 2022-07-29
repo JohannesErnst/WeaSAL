@@ -173,6 +173,10 @@ class Vaihingen3DWLConfig(Config):
     initial_labels_per_file = 100
     added_labels_per_epoch = int(initial_labels_per_file*0.5)
 
+    # Decide whether to subsample weak labels 
+    # --> must be True for active_learning_iterations > 0
+    subsample_labels = True
+
     # Other parameters
     model_name = 'KPFCNN_mprm'
     loss_type = 'region_mprm_loss'

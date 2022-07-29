@@ -99,14 +99,17 @@ if __name__ == '__main__':
     #       > 'results/XLabel/Log_YYYY-MM-DD_HH-MM-SS': Directly provide the path of a trained model
 
     chosen_log = 'results/WeakLabel/Log_2022-06-28_08-27-45'
-    # chosen_log = 'last_DALESPL'
-    chosen_log = 'last_Vaihingen3DWL'
+    chosen_log = 'last_DALESWL'
+    # chosen_log = 'last_Vaihingen3DWL'
 
     # Choose the index of the checkpoint to load OR None if you want to load the current checkpoint
     chkp_idx = -1
 
-    # Choose to test on validation or test split
-    on_val = True
+    # Choose to test on validation, test or train split
+    # Choose: set = 'train', set = 'validation', set = 'test'
+    set = 'train'
+    
+    # Choose to test on train (e.g. for pseudo label generation)
 
     # Deal with 'last_XXXXXX' choices
     chosen_log = model_choice(chosen_log)
@@ -163,14 +166,15 @@ if __name__ == '__main__':
     print('Data Preparation')
     print('****************')
 
-    if on_val:
-        set = 'validation'
-    else:
+    if set == 'train':
         set = 'test'
+        test_on_train = True
+    else:
+        test_on_train = False
 
     # Initiate dataset and set number of votes for testing
     if config.dataset == 'Vaihingen3DWL':
-        test_dataset = Vaihingen3DWLDataset(config, set=set, use_potentials=True)
+        test_dataset = Vaihingen3DWLDataset(config, set, use_potentials=True, test_on_train=test_on_train)
         test_sampler = Vaihingen3DWLSampler(test_dataset)
         collate_fn = Vaihingen3DWLCollate
         num_votes = 10
@@ -180,7 +184,7 @@ if __name__ == '__main__':
         collate_fn = Vaihingen3DPLCollate
         num_votes = 10
     elif config.dataset == 'DALESWL':
-        test_dataset = DALESWLDataset(config, set=set, use_potentials=True)
+        test_dataset = DALESWLDataset(config, set=set, use_potentials=True, test_on_train=test_on_train)
         test_sampler = DALESWLSampler(test_dataset)
         collate_fn = DALESWLCollate
         num_votes = 1
@@ -224,6 +228,6 @@ if __name__ == '__main__':
 
     # Testing
     if config.dataset_task == 'cloud_segmentation':
-        tester.cloud_segmentation_test(net, test_loader, config, num_votes)
+        tester.cloud_segmentation_test(net, test_loader, config, num_votes, test_on_train=test_on_train)
     else:
         raise ValueError('Unsupported dataset_task for testing: ' + config.dataset_task)

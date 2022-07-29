@@ -84,7 +84,7 @@ class ModelTesterPL:
     # Test main methods
     # ------------------------------------------------------------------------------------------------------------------
 
-    def cloud_segmentation_test(self, net, test_loader, config, num_votes=100, debug=False):
+    def cloud_segmentation_test(self, net, test_loader, config, num_votes=100, debug=False, test_on_train=False):
         """
         Test method for cloud segmentation models
         """
@@ -364,7 +364,10 @@ class ModelTesterPL:
 
                     # Save confusion matrix without "ignore" label
                     cm_path = join(test_path, 'predictions')
-                    cm_name = test_loader.dataset.name + '_' + test_loader.dataset.set
+                    if not test_on_train:
+                        cm_name = test_loader.dataset.name + '_' + test_loader.dataset.set
+                    else:
+                        cm_name = test_loader.dataset.name + '_train'
                     valid_label_names = dict.copy(test_loader.dataset.label_to_names)
                     del valid_label_names[10]
                     conf_matrix.plot(Confs, valid_label_names, cm_path, file_suffix=cm_name,
