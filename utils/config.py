@@ -282,7 +282,7 @@ class Config:
                 elif line_info[0] == 'active_learning_iterations':
                     setattr(self, line_info[0], int(line_info[2]))
 
-                elif line_info[0] == 'subsample_labels':        # test this -jer
+                elif line_info[0] == 'subsample_labels':
                     setattr(self, line_info[0], bool(line_info[2]))
 
                 elif line_info[0] == 'initial_labels_per_file':

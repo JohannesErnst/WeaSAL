@@ -87,7 +87,7 @@ class DALESWLConfig(Config):
     num_kernel_points = 15
 
     # Radius of the input sphere (decrease value to reduce memory cost)
-    in_radius = 16      # was 20 -jer
+    in_radius = 12      # was 20 -jer
 
     # Radius of the subcloud for weak labels (smaller means more labels but better results)
     sub_radius = 4      # was 5 -jer
@@ -152,7 +152,7 @@ class DALESWLConfig(Config):
     validation_size = 200
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 20
+    checkpoint_gap = 30
 
     # Augmentations
     augment_scale_anisotropic = True
@@ -169,8 +169,8 @@ class DALESWLConfig(Config):
     dropout = 0.5
 
     # Active learning parameters
-    active_learning_iterations = 3
-    initial_labels_per_file = 100
+    active_learning_iterations = 10
+    initial_labels_per_file = 200
     added_labels_per_epoch = int(initial_labels_per_file*0.5)
 
     # Decide whether to subsample weak labels 
