@@ -31,6 +31,7 @@ from torch.utils.data import DataLoader
 
 from utils.config import Config
 from utils.trainer_PseudoLabel import ModelTrainer
+from utils.tester_PseudoLabel import ModelTesterPL
 from models.architectures import KPFCNN
 
 
@@ -138,7 +139,7 @@ class Vaihingen3DPLConfig(Config):
     #####################
 
     # Maximal number of epochs
-    max_epoch = 150
+    max_epoch = 2  # was 150 -jer
 
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
@@ -174,11 +175,15 @@ class Vaihingen3DPLConfig(Config):
     contrast_start = 0
     contrast_thd = 20
 
+    # Active learning parameters (label parameters are per input file)
+    active_learning_iterations = 10
+    added_labels_per_epoch = 5000
+
     # Choose model name and pseudo label log
     model_name = 'KPFCNN'
     weak_label_log = 'Log_2022-07-06_14-08-24'
 
-    # Choose weights for class
+    # Choose weights for classes
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     weight_file = join('data', dataset[:-2], 'PseudoLabels', weak_label_log,
                        dataset[:-2] + '_t' + str(contrast_thd) + '_weight.txt')
@@ -252,65 +257,102 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         config.saving_path = sys.argv[1]
 
-    # Initialize datasets
-    training_dataset = Vaihingen3DPLDataset(config, set='training', use_potentials=True)
-    test_dataset = Vaihingen3DPLDataset(config, set='validation', use_potentials=True)
+    # Active learning loop
+    for iteration in range(config.active_learning_iterations + 1):
 
-    # Initialize samplers
-    training_sampler = Vaihingen3DPLSampler(training_dataset)
-    test_sampler = Vaihingen3DPLSampler(test_dataset)
+        # Initialize datasets
+        training_dataset = Vaihingen3DPLDataset(config, set='training', use_potentials=True, al_iteration=iteration)
+        validation_dataset = Vaihingen3DPLDataset(config, set='validation', use_potentials=True)
 
-    # Initialize the dataloader
-    training_loader = DataLoader(training_dataset,
+        # Initialize dataset for testing on the training set (test_on_train=True)
+        test_dataset = Vaihingen3DPLDataset(config, set='test', use_potentials=True, test_on_train=True)
+
+        # Initialize samplers
+        training_sampler = Vaihingen3DPLSampler(training_dataset)
+        validation_sampler = Vaihingen3DPLSampler(validation_dataset)
+        test_sampler = Vaihingen3DPLSampler(test_dataset)
+
+        # Initialize the dataloader
+        training_loader = DataLoader(training_dataset,
+                                    batch_size=1,
+                                    sampler=training_sampler,
+                                    collate_fn=Vaihingen3DPLCollate,
+                                    num_workers=config.input_threads,
+                                    pin_memory=True)
+        validation_loader = DataLoader(validation_dataset,
+                                batch_size=1,
+                                sampler=validation_sampler,
+                                collate_fn=Vaihingen3DPLCollate,
+                                num_workers=config.input_threads,
+                                pin_memory=True)
+        test_loader = DataLoader(test_dataset,
                                  batch_size=1,
-                                 sampler=training_sampler,
+                                 sampler=test_sampler,
                                  collate_fn=Vaihingen3DPLCollate,
                                  num_workers=config.input_threads,
                                  pin_memory=True)
-    test_loader = DataLoader(test_dataset,
-                             batch_size=1,
-                             sampler=test_sampler,
-                             collate_fn=Vaihingen3DPLCollate,
-                             num_workers=config.input_threads,
-                             pin_memory=True)
 
-    # Calibrate samplers
-    training_sampler.calibration(training_loader, verbose=True)
-    test_sampler.calibration(test_loader, verbose=True)
+        # Calibrate samplers
+        training_sampler.calibration(training_loader, verbose=True)
+        validation_sampler.calibration(validation_loader, verbose=True)
+        test_sampler.calibration(test_loader, verbose=True)
 
-    # Optional debug functions
-    # debug_timing(training_dataset, training_loader)
-    # debug_timing(test_dataset, test_loader)
-    # debug_upsampling(training_dataset, training_loader)
+        # Optional debug functions
+        # debug_timing(training_dataset, training_loader)
+        # debug_timing(test_dataset, test_loader)
+        # debug_upsampling(training_dataset, training_loader)
 
-    print('\nModel Preparation')
-    print('*****************')
+        print('\nModel Preparation')
+        print('*****************')
 
-    # Define network model
-    t1 = time.time()
-    net = KPFCNN(config, training_dataset.label_values, training_dataset.ignored_labels)
+        # Define network model
+        t1 = time.time()
+        net = KPFCNN(config, training_dataset.label_values, training_dataset.ignored_labels)
 
-    debug = False
-    if debug:
-        print('\n*************************************\n')
-        print(net)
-        print('\n*************************************\n')
-        for param in net.parameters():
-            if param.requires_grad:
-                print(param.shape)
-        print('\n*************************************\n')
-        print("Model size %i" % sum(param.numel() for param in net.parameters() if param.requires_grad))
-        print('\n*************************************\n')
+        debug = False
+        if debug:
+            print('\n*************************************\n')
+            print(net)
+            print('\n*************************************\n')
+            for param in net.parameters():
+                if param.requires_grad:
+                    print(param.shape)
+            print('\n*************************************\n')
+            print("Model size %i" % sum(param.numel() for param in net.parameters() if param.requires_grad))
+            print('\n*************************************\n')
 
-    # Define a trainer class
-    trainer = ModelTrainer(net, config, chkp_path=chosen_chkp)
-    print('Done in {:.1f}s\n'.format(time.time() - t1))
+        # Define a trainer class
+        trainer = ModelTrainer(net, config, chkp_path=chosen_chkp)
+        print('Done in {:.1f}s\n'.format(time.time() - t1))
 
-    print('\nStart training')
-    print('**************')
+        print('\nStart training')
+        print('**************')
 
-    # Training
-    trainer.train(net, training_loader, test_loader, config)
+        # Training
+        trainer.train(net, training_loader, validation_loader, config, al_iteration=iteration)
+
+        # Get amount of used ground truth point labels and print
+        tree_path = join(training_loader.dataset.path, 'input_{:.3f}'.format(config.first_subsampling_dl))
+        labels_gt_num = 0
+        for cloud_name in training_loader.dataset.cloud_names:  
+            label_gt_file = join(tree_path, cloud_name + '_al_groundTruth_IDs.pkl')
+            with open(label_gt_file, 'rb') as f:
+                label_gt_ids = pickle.load(f)
+            labels_gt_num += len(label_gt_ids)
+        print('\n*********************************************')
+        print('Amount of ground truth point labels:  {:d}'.format(labels_gt_num))
+        print('*********************************************\n')
+
+        # Test network on training data to get point probabilities for active learning
+        # --> Ground truth point labels are added for the next iteration in cloud_segmentation_test
+        if config.active_learning_iterations and not iteration == config.active_learning_iterations:
+            torch.cuda.empty_cache()
+            chosen_chkp = os.path.join(config.saving_path, 'checkpoints/current_chkp.tar')
+            tester = ModelTesterPL(net, chkp_path=chosen_chkp)
+            tester.cloud_segmentation_test(net, test_loader, config, num_votes=1, active_learning=True) # change backl to 10 -jer
+        
+        # Reset the checkpoint to ensure a new training network for the next iteration
+        chosen_chkp = None
 
     print('Forcing exit now')
     os.kill(os.getpid(), signal.SIGINT)
