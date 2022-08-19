@@ -105,11 +105,9 @@ if __name__ == '__main__':
     # Choose the index of the checkpoint to load OR None if you want to load the current checkpoint
     chkp_idx = -1
 
-    # Choose to test on validation, test or train split
+    # Choose to test on validation, test or train split (train for pseudo label generation)
     # Choose: set = 'train', set = 'validation', set = 'test'
     set = 'train'
-    
-    # Choose to test on train (e.g. for pseudo label generation)
 
     # Deal with 'last_XXXXXX' choices
     chosen_log = model_choice(chosen_log)

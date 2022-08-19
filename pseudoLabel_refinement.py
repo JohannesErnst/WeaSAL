@@ -77,11 +77,12 @@ def get_weak_labels_per_point(cloud_name, sub_folder, anchor_method, num_classes
 
 
 # Define weak label log for pseudo label refinement (from test/WeakLabel)
-weak_label_log = 'Log_2022-07-07_10-41-04'
+weak_label_log = 'Log_2022-08-07_18-20-08'
 
 # Define threshold (in percent) for ignoring uncertain labels
 # !! THIS HAS TO BE ADAPTED FOR DALES !! -jer
-threshold = 2
+# Currently used 10 for DALES and 20 for V3D
+threshold = 10
 
 # Load configuration
 config_path = join('results/WeakLabel', weak_label_log)
@@ -163,9 +164,11 @@ for file in refinement_list:
 
 # Create weights based on label occurance for all training files and save as file
 if 0 in counts:
-    raise ValueError('Pseudo labels are missing classes! Lower threshold or improve weak label training.')
-weights = np.log(1/(counts/np.sum(counts)))
-weights_norm = weights/np.sum(weights)
+    print('\nPseudo labels are missing classes! Identity weight file generated. Lower threshold or improve weak label training.')
+    weights_norm = np.ones(config.num_classes, np.int)
+else:
+    weights = np.log(1/(counts/np.sum(counts)))
+    weights_norm = weights/np.sum(weights)
 weights_path = join(out_folder, config.dataset[:-2]+'_t'+str(threshold)+'_weight.txt')
 np.savetxt(weights_path, weights_norm, fmt='%.3f')
 print('\nCreated: ' + weights_path + '\n')
