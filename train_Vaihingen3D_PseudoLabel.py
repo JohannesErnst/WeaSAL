@@ -139,7 +139,7 @@ class Vaihingen3DPLConfig(Config):
     #####################
 
     # Maximal number of epochs
-    max_epoch = 2  # was 150 -jer
+    max_epoch = 150
 
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
@@ -339,9 +339,9 @@ if __name__ == '__main__':
             with open(label_gt_file, 'rb') as f:
                 label_gt_ids = pickle.load(f)
             labels_gt_num += len(label_gt_ids)
-        print('\n*********************************************')
+        print('\n***********************************************')
         print('Amount of ground truth point labels:  {:d}'.format(labels_gt_num))
-        print('*********************************************\n')
+        print('***********************************************\n')
 
         # Test network on training data to get point probabilities for active learning
         # --> Ground truth point labels are added for the next iteration in cloud_segmentation_test
@@ -349,7 +349,7 @@ if __name__ == '__main__':
             torch.cuda.empty_cache()
             chosen_chkp = os.path.join(config.saving_path, 'checkpoints/current_chkp.tar')
             tester = ModelTesterPL(net, chkp_path=chosen_chkp)
-            tester.cloud_segmentation_test(net, test_loader, config, num_votes=1, active_learning=True) # change backl to 10 -jer
+            tester.cloud_segmentation_test(net, test_loader, config, num_votes=10, active_learning=True)
         
         # Reset the checkpoint to ensure a new training network for the next iteration
         chosen_chkp = None

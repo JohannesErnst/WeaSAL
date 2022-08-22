@@ -98,11 +98,14 @@ class Vaihingen3DPLDataset(PointCloudDataset):
 
         # Path of the training files and test files
         self.train_path = 'Training'
+        self.validation_path = 'Validation'
         self.test_path = 'Test'
 
         # List of files to process
         if self.set == 'test':
             ply_path = join(self.path, self.test_path)
+        elif self.set == 'validation':
+            ply_path = join(self.path, self.validation_path)
         else:
             ply_path = join(self.path, self.train_path)
 
@@ -647,6 +650,8 @@ class Vaihingen3DPLDataset(PointCloudDataset):
         # Folder for the ply files
         if self.set == 'test':
             ply_path = join(self.path, self.test_path)
+        elif self.set == 'validation':
+            ply_path = join(self.path, self.validation_path)
         else:
             ply_path = join(self.path, self.train_path)
         if not exists(ply_path):

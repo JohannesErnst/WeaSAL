@@ -429,6 +429,7 @@ class KPFCNN(nn.Module):
             # Well it seems like the probs are usually inbetween 0.11 and 0.21. So the threshold doesn't do anything here
             # I guess then the whole contrast loss doesn't work properly for DALES (maybe mention that in thesis)
             # ALso test this when having higher epochs...
+            # This problem is in combination with the pseudo label refinement for DALES...
             
             # Get probabilities
             prob = torch.nn.Softmax(1)(outputs) 

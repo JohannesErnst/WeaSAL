@@ -397,7 +397,7 @@ class ModelTesterPL:
                             entropy_scores = -np.sum(all_probs[file_path+'.ply'] * 
                                                      np.log2(all_probs[file_path+'.ply']+1e-12), axis=1)
 
-                            # Define path to the file with the ground truth label indices -jer
+                            # Define path to the file with the ground truth label indices
                             tree_path = join(test_loader.dataset.path, 'input_{:.3f}'.format(config.first_subsampling_dl))
                             cloud_name = test_loader.dataset.cloud_names[i]
                             label_gt_file = join(tree_path, cloud_name + '_al_groundTruth_IDs.pkl')

@@ -99,15 +99,17 @@ if __name__ == '__main__':
     #       > 'results/XLabel/Log_YYYY-MM-DD_HH-MM-SS': Directly provide the path of a trained model
 
     chosen_log = 'results/WeakLabel/Log_2022-06-28_08-27-45'
-    chosen_log = 'last_DALESWL'
+    # chosen_log = 'last_DALESWL'
     # chosen_log = 'last_Vaihingen3DWL'
+    # chosen_log = 'last_Vaihingen3DPL'
+    chosen_log = 'last_DALESPL'
 
     # Choose the index of the checkpoint to load OR None if you want to load the current checkpoint
     chkp_idx = -1
 
     # Choose to test on validation, test or train split (train for pseudo label generation)
     # Choose: set = 'train', set = 'validation', set = 'test'
-    set = 'train'
+    set = 'test'
 
     # Deal with 'last_XXXXXX' choices
     chosen_log = model_choice(chosen_log)
@@ -177,7 +179,7 @@ if __name__ == '__main__':
         collate_fn = Vaihingen3DWLCollate
         num_votes = 10
     elif config.dataset == 'Vaihingen3DPL':
-        test_dataset = Vaihingen3DPLDataset(config, set=set, use_potentials=True)
+        test_dataset = Vaihingen3DPLDataset(config, set=set, use_potentials=True, test_on_train=test_on_train)
         test_sampler = Vaihingen3DPLSampler(test_dataset)
         collate_fn = Vaihingen3DPLCollate
         num_votes = 10
@@ -187,7 +189,7 @@ if __name__ == '__main__':
         collate_fn = DALESWLCollate
         num_votes = 1
     elif config.dataset == 'DALESPL':
-        test_dataset = DALESPLDataset(config, set=set, use_potentials=True)
+        test_dataset = DALESPLDataset(config, set=set, use_potentials=True, test_on_train=test_on_train)
         test_sampler = DALESPLSampler(test_dataset)
         collate_fn = DALESPLCollate
         num_votes = 1

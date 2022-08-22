@@ -695,14 +695,14 @@ def experiment_active_learning_compare():
     """
 
     # Define active learing log by date
-    log = 'Log_2022-08-05_19-35-38'
+    log = 'Log_2022-08-20_06-43-32'
 
     # Give log name for legend
     log_name = ['V3D WL baseline']
 
-    # Name of the result path (either WeakLabel or PseudoLabel) # check this -jer
-    res_path = 'results/WeakLabel'
-    # res_path = 'results/PseudoLabel'
+    # Name of the result path (either WeakLabel or PseudoLabel)
+    # res_path = 'results/WeakLabel'
+    res_path = 'results/PseudoLabel'
 
     # Add full log path
     log_path = [join(res_path, log)]

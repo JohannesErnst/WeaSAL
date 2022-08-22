@@ -138,7 +138,7 @@ for file in refinement_list:
 
     # Select only confident (i.e. with high probability) predictions
     # and assign "no-label" (here: 10) to the rest of the points
-    # WARNING: In the following code (pseudo label training), the use of
+    # NOTE: In the following code (pseudo label training), the use of
     # "10" as "no-label" is hard-coded! Changes might lead to errors
     empty = np.max(probs, axis=-1) < (0.01*threshold)
     pseudo_lbs = pseudo_lbs[indices]
@@ -164,11 +164,9 @@ for file in refinement_list:
 
 # Create weights based on label occurance for all training files and save as file
 if 0 in counts:
-    print('\nPseudo labels are missing classes! Identity weight file generated. Lower threshold or improve weak label training.')
-    weights_norm = np.ones(config.num_classes, np.int)
-else:
-    weights = np.log(1/(counts/np.sum(counts)))
-    weights_norm = weights/np.sum(weights)
+    print('\nWARNING:\nPseudo labels are missing classes! Lower threshold or improve weak label training.')
+weights = np.log(1/((counts+1)/np.sum(counts)))
+weights_norm = weights/np.sum(weights)
 weights_path = join(out_folder, config.dataset[:-2]+'_t'+str(threshold)+'_weight.txt')
 np.savetxt(weights_path, weights_norm, fmt='%.3f')
 print('\nCreated: ' + weights_path + '\n')
