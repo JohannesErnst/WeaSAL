@@ -170,6 +170,10 @@ class ModelTrainer:
             self.step = 0
             for batch in training_loader:
 
+                ##################
+                # Processing batch
+                ##################
+
                 # Check if batch contains no subregion labels
                 # In this case we cannot calculate loss --> Skip batch
                 if not any(batch.region):
@@ -178,10 +182,6 @@ class ModelTrainer:
                 # Check kill signal (running_PID.txt deleted)
                 if config.saving and not exists(PID_file):
                     continue
-
-                ##################
-                # Processing batch
-                ##################
 
                 # New time
                 t = t[-1:]
@@ -366,7 +366,8 @@ class ModelTrainer:
                 batch.to(self.device)
 
             # Forward pass
-            self.logits, self.class_logits, self.cam = net(batch, config)
+            # This next line here causes the main memory problem because it builds up over batches. What to do? -jer
+            self.logits, _, _ = net(batch, config)
 
             # Get probs and labels
             stacked_probs = softmax(self.logits).cpu().detach().numpy()
@@ -374,7 +375,6 @@ class ModelTrainer:
             lengths = batch.lengths[0].cpu().numpy()
             in_inds = batch.input_inds.cpu().numpy()
             cloud_inds = batch.cloud_inds.cpu().numpy()
-            torch.cuda.synchronize(self.device)
 
             # Get predictions and labels per instance
             # ***************************************
@@ -396,6 +396,9 @@ class ModelTrainer:
                 predictions.append(probs)
                 targets.append(target)
                 i0 += length
+            
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize(self.device)
 
             # Average timing
             t += [time.time()]
