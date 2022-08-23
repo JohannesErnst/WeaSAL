@@ -233,7 +233,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 
                         # Select a subsample of all weak labels for active learning
                         anchor, anchor_tree, anchors_dict, anchor_lb, anchor_inds_sub = subsample_anchors(
-                            anchor, anchors_dict, anchor_lb, config.initial_labels_per_file)
+                            anchor, anchors_dict, anchor_lb, config.initial_labels_per_file, config.subsample_method)
 
                         # Save the indices of the subsampled anchors as pickle file
                         with open(anchors_subsampled_file, 'wb') as f:

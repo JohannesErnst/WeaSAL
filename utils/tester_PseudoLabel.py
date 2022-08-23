@@ -428,6 +428,9 @@ class ModelTesterPL:
 
             test_epoch += 1
 
+            # Empty cache for more memory
+            torch.cuda.empty_cache()
+
             # Break when reaching number of desired votes
             if last_min > num_votes:
                 break

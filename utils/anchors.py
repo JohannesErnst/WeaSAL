@@ -19,6 +19,7 @@
 
 # Import libs
 import numpy as np
+import random
 from utils.mayavi_visu import *
 
 
@@ -94,7 +95,7 @@ def anchors_with_points(input_tree, anchors, lbs, radius, n_class):
             cls_lbs = np.unique(slc_lbs)
             cloud_labels = np.zeros((n_class))
             cloud_labels[cls_lbs] = 1
-            anchor_lbs[cc] = cloud_labels
+            anchor_lbs[cc] = cloud_labels.astype(int)
             cc = cc + 1
             
     clean_anchors = np.array(clean_anchors)
@@ -133,7 +134,7 @@ def update_anchors(input_tree, clean_anchors, anchor_tree, anchors_dict, anchor_
             if (anchor_lbs[idx] != anchor_lbs[nei]).sum() > 0:
                 new_anchor = np.mean(points[new_idxs], axis=0)
                 anchors_dict[cc] = [[new_idxs], [new_anchor]]
-                anchor_lbs[cc] = anchor_lbs[idx] * anchor_lbs[nei]
+                anchor_lbs[cc] = (anchor_lbs[idx] * anchor_lbs[nei]).astype(int)
                 clean_anchors = np.vstack((clean_anchors, np.expand_dims(new_anchor, axis=0)))
                 cc = cc+1
                 
@@ -158,15 +159,80 @@ def select_anchors(anchor, anchors_dict, anchor_lb, anchor_inds_sub):
 
     return anchor_sub, anchor_tree_sub, anchors_dict_sub, anchor_lb_sub
 
-def subsample_anchors(anchor, anchors_dict, anchor_lb, anchor_count):
+def subsample_anchors(anchor, anchors_dict, anchor_lb, anchor_count, subsample_method):
     """
     Function subsamples anchors (i.e. subregions) for active learning to a given
     amount and returns the updated anchor variables as well as a list with the 
     indices of the subsampled anchors. The indices are based on the full anchor set.
+
+    Subsample_method defines the way we subsample the weak labels:
+        - linear:   Produces linearly subsampled anchors
+        - random:   Produces randomly selected anchors
+        - balanced: Produces equal amount of weak labels for each class
     """
 
-    # Linearly subsample the available anchors and save the remaining indices
-    anchor_inds_sub = np.round(np.linspace(0, anchor.shape[0]-1, anchor_count)).astype(int)
+    # Switch between subsample methods
+    if subsample_method == 'linear':
+
+        # Linearly subsample the available anchors and save the remaining indices
+        anchor_inds_sub = np.round(np.linspace(0, anchor.shape[0]-1, anchor_count)).astype(int)
+    
+    elif subsample_method == 'random':
+
+        # Create a variable that holds all anchor indices
+        anchor_inds = list(range(len(anchor_lb)))
+
+        # Select random anchor indices
+        anchor_inds_sub = sorted(random.choices(anchor_inds, k=anchor_count))
+
+    elif subsample_method == 'balanced':
+
+        # Create a dictionary that holds the weak label occurances of all classes
+        label_class_counts = dict()
+
+        # Create a variable that holds all anchor indices
+        anchor_inds = list(range(len(anchor_lb)))
+
+        # Initialize the dictionary with empty lists to be filled
+        for label in range(len(anchor_lb[0])):
+            label_class_counts[label] = []
+
+        # Loop over all weak labels to save the occurance of classes
+        for key in anchor_lb:
+            weak_label = anchor_lb[key]
+            classes = np.where(weak_label == 1)[0]
+            for idx in classes:
+                label_class_counts[idx].append(key)
+
+        # Define approximate number of labels per class (rounded down)
+        labels_per_class = int(anchor_count/len(label_class_counts))
+
+        # Pick same amount of labels from each class (if available)
+        anchor_inds_sub = []
+        for label in label_class_counts:
+            if len(label_class_counts[label]) >= labels_per_class:
+                per_class_ids = np.round(np.linspace(0, len(label_class_counts[label])-1, labels_per_class)).astype(int)
+                anchor_inds_sub += [label_class_counts[label][i] for i in per_class_ids]
+            else:
+                anchor_inds_sub += label_class_counts[label]
+
+        # Filter label_class_counts to only contain unique labels
+        anchor_inds_sub = list(set(anchor_inds_sub))
+
+        # Select remaining anchor indices that are not picked yet
+        for sub_ind in anchor_inds_sub:
+            anchor_inds.remove(sub_ind)
+
+        # Randomly add remaining amount of labels to reach anchor_count
+        remaining_labels = anchor_count-len(anchor_inds_sub)
+        random_labels = random.choices(anchor_inds, k=remaining_labels)
+        anchor_inds_sub += random_labels
+
+        # Sort the selected labels
+        anchor_inds_sub = sorted(anchor_inds_sub)
+    
+    else:
+        raise ValueError('Subsample method "' + subsample_method + '" is not supported!')
 
     # Use indices to reduce the anchor variables
     anchor_sub, anchor_tree_sub, anchors_dict_sub, anchor_lb_sub = select_anchors(

@@ -239,7 +239,7 @@ class DALESWLDataset(PointCloudDataset):
 
                         # Select a subsample of all weak labels for active learning
                         anchor, anchor_tree, anchors_dict, anchor_lb, anchor_inds_sub = subsample_anchors(
-                            anchor, anchors_dict, anchor_lb, config.initial_labels_per_file)
+                            anchor, anchors_dict, anchor_lb, config.initial_labels_per_file, config.subsample_method)
 
                         # Save the indices of the subsampled anchors as pickle file
                         with open(anchors_subsampled_file, 'wb') as f:
@@ -635,10 +635,16 @@ class DALESWLDataset(PointCloudDataset):
         self.coord_offset = np.vstack((data['x'][0], data['y'][0], data['z'][0])).T
 
         # Assign training/validation and test cloud names
+        train_split = []
+        for split in self.all_splits:
+            if split != self.validation_split and split not in self.test_split:
+                train_split.append(split)
         if self.set == 'test':
-            cloud_names_sort = [self.cloud_names[i] for i in self.test_split]     
+            cloud_names_sort = [self.cloud_names[i] for i in self.test_split]
+        elif self.set == 'validation':
+            cloud_names_sort = [self.cloud_names[self.validation_split]]
         else:
-            cloud_names_sort = self.cloud_names[0:self.test_split[0]]
+            cloud_names_sort = [self.cloud_names[i] for i in train_split]
 
         # Prepare all clouds
         for cloud_name in cloud_names_sort:

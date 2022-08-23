@@ -171,6 +171,7 @@ class Vaihingen3DWLConfig(Config):
     # Active learning parameters (label parameters are per input file)
     active_learning_iterations = 10
     initial_labels_per_file = 100
+    subsample_method = 'balanced'
     added_labels_per_epoch = int(initial_labels_per_file*0.5)
 
     # Decide whether to subsample weak labels 

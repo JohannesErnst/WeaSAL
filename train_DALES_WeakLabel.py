@@ -170,7 +170,8 @@ class DALESWLConfig(Config):
 
     # Active learning parameters (label parameters are per input file)
     active_learning_iterations = 10
-    initial_labels_per_file = 200
+    initial_labels_per_file = 200       # maybe increase this (to 1000) value and then reduce the added_labels per epoch (to get the most out of balanced anchor subsampling) -jer
+    subsample_method = 'balanced'
     added_labels_per_epoch = int(initial_labels_per_file*0.5)
 
     # Decide whether to subsample weak labels 

@@ -288,6 +288,9 @@ class Config:
                 elif line_info[0] == 'initial_labels_per_file':
                     setattr(self, line_info[0], int(line_info[2]))
                 
+                elif line_info[0] == 'subsample_method':
+                    setattr(self, line_info[0], line_info[2])
+                
                 elif line_info[0] == 'added_labels_per_epoch':
                     setattr(self, line_info[0], int(line_info[2]))
 
@@ -432,6 +435,8 @@ class Config:
                 text_file.write('subsample_labels = {:d}\n'.format(int(self.subsample_labels)))
             if hasattr(self, 'initial_labels_per_file'):
                 text_file.write('initial_labels_per_file = {:d}\n'.format(self.initial_labels_per_file))
+            if hasattr(self, 'subsample_method'):
+                text_file.write('subsample_method = {:s}\n'.format(self.subsample_method))
             if hasattr(self, 'added_labels_per_epoch'):
                 text_file.write('added_labels_per_epoch = {:d}\n'.format(self.added_labels_per_epoch))
             if hasattr(self, 'weak_label_log'):
