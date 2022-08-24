@@ -94,8 +94,8 @@ class DALESPLConfig(Config):
     # Number of kernel points
     num_kernel_points = 15
 
-    # Radius of the input sphere (decrease value to reduce memory cost)
-    in_radius = 18      # was 20 -jer
+    # Radius of the input sphere (decrease value to reduce memory cost) (default 20)
+    in_radius = 18
 
     # Size of the first subsampling grid in meter (increase value to reduce memory cost)
     first_subsampling_dl = 0.4

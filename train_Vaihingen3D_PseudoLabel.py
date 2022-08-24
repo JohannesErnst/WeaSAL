@@ -94,7 +94,7 @@ class Vaihingen3DPLConfig(Config):
     # Number of kernel points
     num_kernel_points = 15
 
-    # Radius of the input sphere (decrease value to reduce memory cost)
+    # Radius of the input sphere (decrease value to reduce memory cost) (default 24)
     in_radius = 24
 
     # Size of the first subsampling grid in meter (increase value to reduce memory cost)

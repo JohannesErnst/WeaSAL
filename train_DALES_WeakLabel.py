@@ -86,11 +86,12 @@ class DALESWLConfig(Config):
     # Number of kernel points
     num_kernel_points = 15
 
-    # Radius of the input sphere (decrease value to reduce memory cost)
-    in_radius = 12      # was 20 -jer
+    # Radius of the input sphere (decrease value to reduce memory cost) (default 20)
+    in_radius = 15
 
     # Radius of the subcloud for weak labels (smaller means more labels but better results)
-    sub_radius = 4      # was 5 -jer
+    # Increse to reduce memory cost (default 5)
+    sub_radius = 5
 
     # Size of the first subsampling grid in meter (increase value to reduce memory cost)
     first_subsampling_dl = 0.4
@@ -133,8 +134,8 @@ class DALESWLConfig(Config):
     # Training parameters
     #####################
 
-    # Maximal number of epochs
-    max_epoch = 60
+    # Maximal number of epochs (default 60)
+    max_epoch = 180
 
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
@@ -145,14 +146,14 @@ class DALESWLConfig(Config):
     # Number of batch (or number of input spheres)
     batch_num = 3
 
-    # Number of steps per epochs
-    epoch_steps = 300
+    # Number of steps per epochs (default 300)
+    epoch_steps = 100
 
-    # Number of validation examples per epoch
+    # Number of validation examples per epoch (default 200)
     validation_size = 200
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 30
+    checkpoint_gap = 90
 
     # Augmentations
     augment_scale_anisotropic = True
@@ -170,9 +171,9 @@ class DALESWLConfig(Config):
 
     # Active learning parameters (label parameters are per input file)
     active_learning_iterations = 10
-    initial_labels_per_file = 200       # maybe increase this (to 1000) value and then reduce the added_labels per epoch (to get the most out of balanced anchor subsampling) -jer
+    initial_labels_per_file = 2500
     subsample_method = 'balanced'
-    added_labels_per_epoch = int(initial_labels_per_file*0.5)
+    added_labels_per_epoch = 500
 
     # Decide whether to subsample weak labels 
     # --> must be True for active_learning_iterations > 0

@@ -86,11 +86,12 @@ class Vaihingen3DWLConfig(Config):
     # Number of kernel points
     num_kernel_points = 15
 
-    # Radius of the input sphere (decrease value to reduce memory cost)
-    in_radius = 20      # was 24, 20 -jer
+    # Radius of the input sphere (decrease value to reduce memory cost) (default 24)
+    in_radius = 20
 
     # Radius of the subcloud for weak labels (smaller means more labels but better results)
-    sub_radius = 5     # was 6, 5 -jer
+    # Increse to reduce memory cost (default 6)
+    sub_radius = 5
 
     # Size of the first subsampling grid in meter (increase value to reduce memory cost)
     first_subsampling_dl = 0.24
@@ -133,8 +134,8 @@ class Vaihingen3DWLConfig(Config):
     # Training parameters
     #####################
 
-    # Maximal number of epochs
-    max_epoch = 2       # was 45 -jer
+    # Maximal number of epochs (default 45)
+    max_epoch = 200
 
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
@@ -143,16 +144,16 @@ class Vaihingen3DWLConfig(Config):
     grad_clip_norm = 1
 
     # Number of batch (or number of input spheres)
-    batch_num = 3       # this was 4,3 but when testing after training we cannot hold so much memory. Maybe we can clear the main part of memory ? -jer
+    batch_num = 3
 
-    # Number of steps per epochs
-    epoch_steps = 50    # was 500 .-jer
+    # Number of steps per epochs (default 500)
+    epoch_steps = 100
 
-    # Number of validation examples per epoch
-    validation_size = 200 # was 200 -jer
+    # Number of validation examples per epoch (default 200)
+    validation_size = 200
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 15
+    checkpoint_gap = 100
 
     # Augmentations
     augment_scale_anisotropic = True
