@@ -135,7 +135,7 @@ class Vaihingen3DWLConfig(Config):
     #####################
 
     # Maximal number of epochs (default 45)
-    max_epoch = 200
+    max_epoch = 80
 
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
@@ -147,13 +147,13 @@ class Vaihingen3DWLConfig(Config):
     batch_num = 3
 
     # Number of steps per epochs (default 500)
-    epoch_steps = 100
+    epoch_steps = 600
 
     # Number of validation examples per epoch (default 200)
     validation_size = 200
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 100
+    checkpoint_gap = 40
 
     # Augmentations
     augment_scale_anisotropic = True

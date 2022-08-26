@@ -422,18 +422,32 @@ class ModelTesterWL:
                             with open(anchors_file, 'rb') as f:
                                 anchor, anchor_tree, anchors_dict, anchor_lb = pickle.load(f)
 
+                            # Count class occurrences for all anchors
+                            label_sum = np.zeros([np.size(anchor_lb[0])], dtype=np.int)
+                            for label in anchor_lb:
+                                label_sum += anchor_lb[label]
+
+                            # Calculate a class score based on occurrences
+                            # NOTE: There are two possible ways here to set up the score. The first one is aiming for rare classes more -jer
+                            class_scores1 = len(anchor_lb)/label_sum
+                            class_scores1 = class_scores1/max(class_scores1)
+                            class_scores2 = np.exp(-label_sum/len(anchor_lb))
+
                             # Loop over all anchors to get the average entropy sampling score
                             anchor_avg_score = np.zeros(len(anchors_dict)).astype(np.float32)
-                            for anchor in anchors_dict:
+                            for idx, anchor in enumerate(anchors_dict):
 
                                 # Find the indices (for the subsampled cloud) of the points in the anchor
                                 anchor_point_ids = np.squeeze(anchors_dict[anchor][0])
 
                                 # Grab the entropy sampling scores for the points in the anchor
-                                anchor_scores = entropy_scores[anchor_point_ids]
+                                anchor_entropy_score = entropy_scores[anchor_point_ids]
 
-                                # Calcualte the average entropy sampling score for the anchor and save
-                                anchor_avg_score[anchor] = np.mean(anchor_scores)
+                                # Calculate the class weighting score for the anchor based on all occuring classes
+                                anchor_class_score = np.matmul(anchor_lb[idx], class_scores2)
+
+                                # Calcualte average entropy sampling score multiplied with weighting score for the anchor
+                                anchor_avg_score[anchor] = np.mean(anchor_entropy_score)*anchor_class_score
 
                             # Sort anchors according to their entropy sampling score (descending) and save indices
                             sort_ids = np.argsort(-anchor_avg_score)

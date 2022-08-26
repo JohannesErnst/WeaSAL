@@ -667,8 +667,8 @@ def experiment_training_compare():
     """
 
     # Using the dates of the logs, you can easily gather consecutive ones. All logs should be of the same dataset.
-    start = 'Log_2022-07-26_12-50-25'
-    end = 'Log_2022-07-26_12-50-25'
+    start = 'Log_2022-07-06_14-08-24'
+    end = 'Log_2022-07-06_14-08-24'
 
     # Name of the result path (either WeakLabel or PseudoLabel)
     res_path = 'results/WeakLabel'
@@ -686,7 +686,10 @@ def experiment_training_compare():
     # safe check log names
     logs_names = np.array(logs_names[:len(logs)])
 
-    return logs, logs_names
+    # Active learning flag
+    al_flag = 0
+
+    return logs, logs_names, al_flag
 
 def experiment_active_learning_compare():
     """
@@ -695,14 +698,14 @@ def experiment_active_learning_compare():
     """
 
     # Define active learing log by date
-    log = 'Log_2022-08-20_06-43-32'
+    log = 'Log_2022-08-25_14-13-07'
 
     # Give log name for legend
     log_name = ['V3D WL baseline']
 
     # Name of the result path (either WeakLabel or PseudoLabel)
-    # res_path = 'results/WeakLabel'
-    res_path = 'results/PseudoLabel'
+    res_path = 'results/WeakLabel'
+    # res_path = 'results/PseudoLabel'
 
     # Add full log path
     log_path = [join(res_path, log)]
@@ -761,8 +764,8 @@ if __name__ == '__main__':
     ######################################################
 
     # My logs: choose the logs to show
-    # logs, logs_names = experiment_training_compare()
-    logs, logs_names, al_flag = experiment_active_learning_compare()
+    logs, logs_names, al_flag = experiment_training_compare()
+    # logs, logs_names, al_flag = experiment_active_learning_compare()
 
     ################
     # Plot functions
