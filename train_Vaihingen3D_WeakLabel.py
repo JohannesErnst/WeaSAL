@@ -135,7 +135,7 @@ class Vaihingen3DWLConfig(Config):
     #####################
 
     # Maximal number of epochs (default 45)
-    max_epoch = 80
+    max_epoch = 50
 
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
@@ -147,13 +147,13 @@ class Vaihingen3DWLConfig(Config):
     batch_num = 3
 
     # Number of steps per epochs (default 500)
-    epoch_steps = 600
+    epoch_steps = 400
 
     # Number of validation examples per epoch (default 200)
     validation_size = 200
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 40
+    checkpoint_gap = 25
 
     # Augmentations
     augment_scale_anisotropic = True
@@ -245,6 +245,12 @@ if __name__ == '__main__':
     config = Vaihingen3DWLConfig()
     if previous_training_path:
         config.load(os.path.join('results/WeakLabel', previous_training_path))
+
+        # Find the current active learning iteration
+        iteration_files = [f for f in os.listdir(config.saving_path) if f[:18] == 'training_iteration']
+        iteration_previous = len(iteration_files)-1
+
+        # Reset saving path
         config.saving_path = None
 
     # Get path from argument if given
@@ -253,6 +259,9 @@ if __name__ == '__main__':
 
     # Active learning loop
     for iteration in range(config.active_learning_iterations + 1):
+
+        if previous_training_path:
+            iteration += iteration_previous
 
         # Initialize datasets for training and validation
         training_dataset = Vaihingen3DWLDataset(config, set='training', use_potentials=True, al_iteration=iteration)

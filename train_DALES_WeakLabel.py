@@ -245,6 +245,12 @@ if __name__ == '__main__':
     config = DALESWLConfig()
     if previous_training_path:
         config.load(os.path.join('results/WeakLabel', previous_training_path))
+
+        # Find the current active learning iteration
+        iteration_files = [f for f in os.listdir(config.saving_path) if f[:18] == 'training_iteration']
+        iteration_previous = len(iteration_files)-1
+
+        # Reset saving path
         config.saving_path = None
 
     # Get path from argument if given
@@ -253,6 +259,9 @@ if __name__ == '__main__':
 
     # Active learning loop
     for iteration in range(config.active_learning_iterations + 1):
+
+        if previous_training_path:
+            iteration += iteration_previous
 
         # Initialize datasets for training and validation
         training_dataset = DALESWLDataset(config, set='training', use_potentials=True, al_iteration=iteration)
