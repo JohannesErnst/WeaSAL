@@ -11,7 +11,7 @@ Please read the `INSTALL.md` file for installation instructions.
 
 
 ## Overview
-This repository includes the processing code for training a classification network with weak-region labels and the subsequent segmentation network trained on pseudo-labels.
+This repository includes the processing code for training a classification network with weak-region labels and the subsequent segmentation network trained on pseudo-labels in [PyTorch](https://pytorch.org/).
 
 As a Convolutional Neural Network, Kernel Point Convolution ([KPConv](https://arxiv.org/abs/1904.08889)) is used:<br/>
 https://github.com/HuguesTHOMAS/KPConv-PyTorch
@@ -45,7 +45,7 @@ Create a ```data/``` folder in ```WeaSAL/``` directory that holds the datasets (
     .
 ```
 Workflow in short:<br/>
-`train_dataset_WeakLabel.py` &rarr; `test_models.py` &rarr; `pseudoLabel_refinement.py` &rarr; `train_*dataset*_PseudoLabel.py` &rarr; `test_models.py`
+`train_dataset_WeakLabel.py` &rarr; `test_models.py` &rarr; `pseudoLabel_refinement.py` &rarr; `train_dataset_PseudoLabel.py` &rarr; `test_models.py`
 
 Workflow in full:
 - Training the network on weak subcloud labels (```train_Vaihingen3D_WeakLabel.py``` or ```train_DALES_WeakLabel.py```). This will create a "results" folder inside the WeaSAL directory where all training results are stored. 
