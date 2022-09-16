@@ -87,10 +87,10 @@ class Vaihingen3DWLConfig(Config):
     num_kernel_points = 15
 
     # Radius of the input sphere (decrease value to reduce memory cost) (default 24)
-    in_radius = 20
+    in_radius = 18
 
     # Radius of the subcloud for weak labels (smaller means more labels but better results)
-    # Increse to reduce memory cost (default 6)
+    # Increse to reduce memory cost (default 6) (delete old _anchors.pkl files in input_xy/ when changing)
     sub_radius = 5
 
     # Size of the first subsampling grid in meter (increase value to reduce memory cost)

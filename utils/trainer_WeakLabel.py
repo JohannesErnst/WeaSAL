@@ -366,7 +366,6 @@ class ModelTrainer:
                 batch.to(self.device)
 
             # Forward pass
-            # This next line here causes the main memory problem because it builds up over batches. What to do? -jer
             self.logits, _, _ = net(batch, config)
 
             # Get probs and labels

@@ -77,11 +77,11 @@ def get_weak_labels_per_point(cloud_name, sub_folder, anchor_method, num_classes
 
 
 # Define weak label log for pseudo label refinement (from test/WeakLabel)
-weak_label_log = 'Log_2022-08-07_18-20-08'
+weak_label_log = 'Log_2022-09-12_08-20-34'
 
-# Define threshold (in percent) for ignoring uncertain labels
-# !! THIS HAS TO BE ADAPTED FOR DALES !! -jer
-# Currently used 10 for DALES and 20 for V3D
+# Define threshold (in percent) for ignoring uncertain labels.
+# NOTE: Values are experimental. Might need adaptation for other datasets.
+# Default: 10 for DALES and 20 for Vaihingen3D
 threshold = 10
 
 # Load configuration

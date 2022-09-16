@@ -185,11 +185,11 @@ class DALESPLConfig(Config):
 
     # Active learning parameters (label parameters are per input file)
     active_learning_iterations = 10
-    added_labels_per_epoch = 20000
+    added_labels_per_epoch = 10000
 
     # Choose model name and pseudo label log
     model_name = 'KPFCNN'
-    weak_label_log = 'Log_2022-08-07_18-20-08'
+    weak_label_log = 'Log_2022-09-12_08-20-34'
 
     # Choose weights for classes
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -259,6 +259,12 @@ if __name__ == '__main__':
     config = DALESPLConfig()
     if previous_training_path:
         config.load(os.path.join('results/PseudoLabel', previous_training_path))
+        
+        # Find the current active learning iteration
+        iteration_files = [f for f in os.listdir(config.saving_path) if f[:18] == 'training_iteration']
+        iteration_previous = len(iteration_files)-1
+
+        # Reset saving path
         config.saving_path = None
 
     # Get path from argument if given
@@ -267,6 +273,9 @@ if __name__ == '__main__':
 
     # Active learning loop
     for iteration in range(config.active_learning_iterations + 1):
+
+        if previous_training_path:
+            iteration += iteration_previous
 
         # Initialize datasets
         training_dataset = DALESPLDataset(config, set='training', use_potentials=True, al_iteration=iteration)

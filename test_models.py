@@ -99,17 +99,17 @@ if __name__ == '__main__':
     #       > 'results/XLabel/Log_YYYY-MM-DD_HH-MM-SS': Directly provide the path of a trained model
 
     chosen_log = 'results/WeakLabel/Log_2022-06-28_08-27-45'
-    # chosen_log = 'last_DALESWL'
+    chosen_log = 'last_DALESWL'
     # chosen_log = 'last_Vaihingen3DWL'
     # chosen_log = 'last_Vaihingen3DPL'
-    chosen_log = 'last_DALESPL'
+    # chosen_log = 'last_DALESPL'
 
     # Choose the index of the checkpoint to load OR None if you want to load the current checkpoint
     chkp_idx = -1
 
     # Choose to test on validation, test or train split (train for pseudo label generation)
     # Choose: set = 'train', set = 'validation', set = 'test'
-    set = 'test'
+    set = 'train'
 
     # Deal with 'last_XXXXXX' choices
     chosen_log = model_choice(chosen_log)

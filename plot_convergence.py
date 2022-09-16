@@ -698,7 +698,7 @@ def experiment_active_learning_compare():
     """
 
     # Define active learing log by date
-    log = 'Log_2022-08-25_14-13-07'
+    log = 'Log_2022-09-12_08-20-34'
 
     # Give log name for legend
     log_name = ['V3D WL baseline']
@@ -764,8 +764,8 @@ if __name__ == '__main__':
     ######################################################
 
     # My logs: choose the logs to show
-    logs, logs_names, al_flag = experiment_training_compare()
-    # logs, logs_names, al_flag = experiment_active_learning_compare()
+    # logs, logs_names, al_flag = experiment_training_compare()
+    logs, logs_names, al_flag = experiment_active_learning_compare()
 
     ################
     # Plot functions

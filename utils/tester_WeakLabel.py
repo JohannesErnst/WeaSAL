@@ -428,10 +428,7 @@ class ModelTesterWL:
                                 label_sum += anchor_lb[label]
 
                             # Calculate a class score based on occurrences
-                            # NOTE: There are two possible ways here to set up the score. The first one is aiming for rare classes more -jer
-                            class_scores1 = len(anchor_lb)/label_sum
-                            class_scores1 = class_scores1/max(class_scores1)
-                            class_scores2 = np.exp(-label_sum/len(anchor_lb))
+                            class_scores = np.exp(-label_sum/len(anchor_lb))
 
                             # Loop over all anchors to get the average entropy sampling score
                             anchor_avg_score = np.zeros(len(anchors_dict)).astype(np.float32)
@@ -444,7 +441,7 @@ class ModelTesterWL:
                                 anchor_entropy_score = entropy_scores[anchor_point_ids]
 
                                 # Calculate the class weighting score for the anchor based on all occuring classes
-                                anchor_class_score = np.matmul(anchor_lb[idx], class_scores2)
+                                anchor_class_score = np.matmul(anchor_lb[idx], class_scores)
 
                                 # Calcualte average entropy sampling score multiplied with weighting score for the anchor
                                 anchor_avg_score[anchor] = np.mean(anchor_entropy_score)*anchor_class_score
