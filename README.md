@@ -1,9 +1,9 @@
 # Weakly Supervised Active Learning
-Combination of Weakly Supervised Learning and Active Learning for 3D Point Cloud Classification with Minimum Labeling Effort.
+Combination of weakly supervised learning and active learning for 3D point cloud classification with minimum labeling effort.
 
 ![Overview](https://user-images.githubusercontent.com/51992212/190665704-7aa8752e-6d4f-4e0a-9475-15954c883007.png)
 
-Graphical overview of the WeaSAL network workflow (adapted from Lin, Y., G. Vosselman, and M. Y. Yang (2022). "Weakly supervised semantic segmentation of airborne laser scanning point clouds", Figure 1)
+Graphical overview of the WeaSAL network workflow (adapted from Lin, Y., G. Vosselman, and M. Y. Yang (2022): "Weakly supervised semantic segmentation of airborne laser scanning point clouds", Figure 1)
 
 
 ## Installation
@@ -21,6 +21,8 @@ https://github.com/plusmultiply/mprm
 
 Main structure for refined Weakly Supervised Semantic Segmentation ([Weak_ALS](https://www.sciencedirect.com/science/article/pii/S0924271622000661)) is based on:<br/>
 https://github.com/yaping222/Weak_ALS
+
+Scripts for training and testing on two datasets are provided, namely *Vaihingen3D* and *DALES*.
 
 
 ## How to use
@@ -42,8 +44,8 @@ Create a ```data/``` folder in ```WeaSAL/``` directory that holds the datasets (
     .
     .
 ```
-Workflow in short:
-```train_*dataset*_WeakLabel.py``` &rarr; ``test_models.py``` &rarr; ```pseudoLabel_refinement.py``` &rarr; ```train_*dataset*_PseudoLabel.py``` &rarr; ```test_models.py```
+Workflow in short:<br/>
+`train_dataset_WeakLabel.py` &rarr; `test_models.py` &rarr; `pseudoLabel_refinement.py` &rarr; `train_*dataset*_PseudoLabel.py` &rarr; `test_models.py`
 
 Workflow in full:
 - Training the network on weak subcloud labels (```train_Vaihingen3D_WeakLabel.py``` or ```train_DALES_WeakLabel.py```). This will create a "results" folder inside the WeaSAL directory where all training results are stored. 
