@@ -3,11 +3,11 @@ Combination of weakly supervised learning and active learning for 3D point cloud
 
 ![Overview](https://user-images.githubusercontent.com/51992212/190665704-7aa8752e-6d4f-4e0a-9475-15954c883007.png)
 
-Graphical overview of the WeaSAL network workflow (adapted from Lin, Y., G. Vosselman, and M. Y. Yang (2022): "Weakly supervised semantic segmentation of airborne laser scanning point clouds", Figure 1)
+Graphical overview of the WeaSAL network workflow (adapted from Lin, Y., G. Vosselman, and M. Y. Yang (2022), "Weakly supervised semantic segmentation of airborne laser scanning point clouds", Figure 1)
 
 
 ## Installation
-Please read the `INSTALL.md` file for installation instructions.
+Will be added in the future (`INSTALL.md`). Please follow the installation instructions for KPConv (PyTorch) for now.
 
 
 ## Overview
