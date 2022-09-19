@@ -49,7 +49,7 @@ from utils.config import bcolors
 class Vaihingen3DPLDataset(PointCloudDataset):
     """Class to handle Vaihingen dataset."""
 
-    def __init__(self, config, set='training', use_potentials=True, load_data=True):
+    def __init__(self, config, set='training', use_potentials=True, load_data=True, test_on_train=False, al_iteration=0):
         """
         This dataset is small enough to be stored in-memory, so load all point clouds here
         """
@@ -98,11 +98,14 @@ class Vaihingen3DPLDataset(PointCloudDataset):
 
         # Path of the training files and test files
         self.train_path = 'Training'
+        self.validation_path = 'Validation'
         self.test_path = 'Test'
 
         # List of files to process
         if self.set == 'test':
             ply_path = join(self.path, self.test_path)
+        elif self.set == 'validation':
+            ply_path = join(self.path, self.validation_path)
         else:
             ply_path = join(self.path, self.train_path)
 
@@ -110,7 +113,13 @@ class Vaihingen3DPLDataset(PointCloudDataset):
         self.cloud_names = ['Vaihingen3D_Training', 'Vaihingen3D_Training', 'Vaihingen3D_Testing']
         self.all_splits = [0, 1, 2]
         self.validation_split = 1
-        self.test_split = 2
+        if not test_on_train:     # normal test dataset
+            self.test_split = 2
+        else:                     # for active learning set 'train' as test dataset
+            self.test_split = 0
+
+        # Set active learning iteration
+        self.al_iteration = al_iteration
 
         # Number of models used per epoch
         if self.set == 'training':
@@ -333,7 +342,6 @@ class Vaihingen3DPLDataset(PointCloudDataset):
 
             # Get points from tree structure
             points = np.array(self.input_trees[cloud_ind].data, copy=False)
-
 
             # Indices of points in input region
             input_inds = self.input_trees[cloud_ind].query_radius(center_point,
@@ -642,6 +650,8 @@ class Vaihingen3DPLDataset(PointCloudDataset):
         # Folder for the ply files
         if self.set == 'test':
             ply_path = join(self.path, self.test_path)
+        elif self.set == 'validation':
+            ply_path = join(self.path, self.validation_path)
         else:
             ply_path = join(self.path, self.train_path)
         if not exists(ply_path):
@@ -747,7 +757,29 @@ class Vaihingen3DPLDataset(PointCloudDataset):
                                          cloud_name + '_t' + str(self.config.contrast_thd) + '_pseudo.txt')
                     sub_labels = np.genfromtxt(pseudo_labels).astype('int32')
                     sub_colors = data['intensity'].T
+
+                    # Define path to the file with the ground truth label indices
+                    label_gt_file = join(tree_path, cloud_name + '_al_groundTruth_IDs.pkl')
+
+                    # Replace labels of uncertain points with ground truth labels
+                    if self.al_iteration:
+
+                        # Load corresponding indices
+                        with open(label_gt_file, 'rb') as f:
+                            label_gt_ids = pickle.load(f)
+
+                        # Load ground truth labels
+                        sub_labels_truth = data['class']
                     
+                        # Replace labels
+                        sub_labels[label_gt_ids] = sub_labels_truth[label_gt_ids]
+
+                    # Else reset the ground truth label point ID files from older runs
+                    else:
+                        label_gt_ids = []
+                        with open(label_gt_file, 'wb') as f:
+                            pickle.dump(label_gt_ids, f)
+
                     # Make sure sub_colors has the right dimension
                     if len(sub_colors.shape) == 1:
                         sub_colors = np.expand_dims(sub_colors, axis=-1)

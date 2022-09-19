@@ -30,20 +30,21 @@ from utils.anchors import *
 #
 
 
-def get_weak_labels_per_point(cloud_name, sub_folder, num_classes):
+def get_weak_labels_per_point(cloud_name, sub_folder, anchor_method, num_classes):
     """
     Get point-wise weak labels for the given input cloud. 
     Uses subcloud labels and overlap region labels as weak labels.
 
     :param cloud_name: Input cloud to create the weak labels for
     :param sub_folder: Folder to subsampled data
+    :param anchor_method: Method for selecting the anchors
     :param num_classes: Number of classes for dataset
     :return: weak_labels
     """
 
     # Name of the input files
     KDTree_file = join(sub_folder, '{:s}_KDTree.pkl'.format(cloud_name))
-    anchors_file = join(sub_folder, '{:s}_anchors.pkl'.format(cloud_name))
+    anchors_file = join(sub_folder, '{:s}_anchors_{:s}.pkl'.format(cloud_name, anchor_method))
 
     # Get data and read pkl with search tree
     if not exists(KDTree_file):
@@ -76,11 +77,12 @@ def get_weak_labels_per_point(cloud_name, sub_folder, num_classes):
 
 
 # Define weak label log for pseudo label refinement (from test/WeakLabel)
-weak_label_log = 'Log_2022-07-07_10-41-04'
+weak_label_log = 'Log_2022-09-12_08-20-34'
 
-# Define threshold (in percent) for ignoring uncertain labels
-# !! THIS HAS TO BE ADAPTED FOR DALES !! -jer
-threshold = 2
+# Define threshold (in percent) for ignoring uncertain labels.
+# NOTE: Values are experimental. Might need adaptation for other datasets.
+# Default: 10 for DALES and 20 for Vaihingen3D
+threshold = 10
 
 # Load configuration
 config_path = join('results/WeakLabel', weak_label_log)
@@ -130,13 +132,13 @@ for file in refinement_list:
 
     # Refine probabilities with ground truth weak labels of subsampled cloud
     print('Getting point-wise weak labels for "' + file_name + '"')
-    weak_labels = get_weak_labels_per_point(file_name, sub_folder, config.num_classes)
+    weak_labels = get_weak_labels_per_point(file_name, sub_folder, config.anchor_method, config.num_classes)
     probs = probs[indices]
     probs = probs*weak_labels
 
     # Select only confident (i.e. with high probability) predictions
     # and assign "no-label" (here: 10) to the rest of the points
-    # WARNING: In the following code (pseudo label training), the use of
+    # NOTE: In the following code (pseudo label training), the use of
     # "10" as "no-label" is hard-coded! Changes might lead to errors
     empty = np.max(probs, axis=-1) < (0.01*threshold)
     pseudo_lbs = pseudo_lbs[indices]
@@ -162,8 +164,8 @@ for file in refinement_list:
 
 # Create weights based on label occurance for all training files and save as file
 if 0 in counts:
-    raise ValueError('Pseudo labels are missing classes! Lower threshold or improve weak label training.')
-weights = np.log(1/(counts/np.sum(counts)))
+    print('\nWARNING:\nPseudo labels are missing classes! Lower threshold or improve weak label training.')
+weights = np.log(1/((counts+1)/np.sum(counts)))
 weights_norm = weights/np.sum(weights)
 weights_path = join(out_folder, config.dataset[:-2]+'_t'+str(threshold)+'_weight.txt')
 np.savetxt(weights_path, weights_norm, fmt='%.3f')

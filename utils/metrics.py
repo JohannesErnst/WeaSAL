@@ -42,7 +42,7 @@ def fast_confusion(true, pred, label_values=None):
     """
 
     # Ensure data is in the right format
-    true = np.squeeze(true)         # If i get an error here, check the script in Weak_ALS (didn't change anything here but probably should have) -jer
+    true = np.squeeze(true)
     pred = np.squeeze(pred)
     if len(true.shape) != 1:
         raise ValueError('Truth values are stored in a {:d}D array instead of 1D array'. format(len(true.shape)))

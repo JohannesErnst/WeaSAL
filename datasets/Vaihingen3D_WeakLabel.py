@@ -50,7 +50,7 @@ from utils.anchors import *
 class Vaihingen3DWLDataset(PointCloudDataset):
     """Class to handle Vaihingen dataset with weak region-labels (WL)."""
 
-    def __init__(self, config, set='training', use_potentials=True, load_data=True):
+    def __init__(self, config, set='training', use_potentials=True, load_data=True, test_on_train=False, al_iteration=0):
         """
         This dataset is small enough to be stored in-memory, so load all point clouds here
         """
@@ -98,11 +98,14 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 
         # Path of the training files and test files
         self.train_path = 'Training'
+        self.validation_path = 'Validation'
         self.test_path = 'Test'
 
         # List of files to process
         if self.set == 'test':
             ply_path = join(self.path, self.test_path)
+        elif self.set == 'validation':
+            ply_path = join(self.path, self.validation_path)
         else:
             ply_path = join(self.path, self.train_path)
 
@@ -110,7 +113,10 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         self.cloud_names = ['Vaihingen3D_Training', 'Vaihingen3D_Training', 'Vaihingen3D_Testing']
         self.all_splits = [0, 1, 2]
         self.validation_split = 1
-        self.test_split = 2
+        if not test_on_train:     # normal test dataset
+            self.test_split = 2
+        else:                     # for active learning set 'train' as test dataset
+            self.test_split = 0
 
         # Number of models used per epoch
         if self.set == 'training':
@@ -191,11 +197,11 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             for i, tree in enumerate(self.input_trees):
                 print('Preparing anchors and weak labels (' +
                       str(i+1) + '/' + str(len(self.input_trees)) + ')')
-                anchors_file = join(self.tree_path, '{:s}_anchors.pkl'.format(self.cloud_names[i]))
+                anchors_file = join(self.tree_path, '{:s}_anchors_{:s}.pkl'.format(self.cloud_names[i], config.anchor_method))
 
                 # Check if anchors have already been computed
                 if exists(anchors_file):
-                    print('Found anchors for cloud {:s}, subsampled at {:.3f}'.format(self.cloud_names[i], self.config.first_subsampling_dl))
+                    print('Found anchors for cloud {:s}, subsampled at {:.3f}\n'.format(self.cloud_names[i], self.config.first_subsampling_dl))
                     
                     # Read pkl to get anchors
                     with open(anchors_file, 'rb') as f:
@@ -207,13 +213,40 @@ class Vaihingen3DWLDataset(PointCloudDataset):
                     anchor, anchor_tree, anchors_dict, anchor_lb = anchors_with_points(
                         tree, anchor, self.input_labels[i], config.sub_radius, config.num_classes)
 
-                    # Update subregion information according to overlaps
-                    anchor, anchor_tree, anchors_dict, anchor_lb = update_anchors(
-                        tree, anchor, anchor_tree, anchors_dict, anchor_lb, config.sub_radius)
+                    # Update subregion information according to overlaps  
+                    if not self.config.subsample_labels:
+                        anchor, anchor_tree, anchors_dict, anchor_lb = update_anchors(
+                            tree, anchor, anchor_tree, anchors_dict, anchor_lb, config.sub_radius)
+                        
+                    # Save the anchors as point cloud for visualization
+                    anchor_file_name = anchors_file[:-4]
+                    write_ply(anchor_file_name, [anchor+self.coord_offset], ['x', 'y', 'z'])
 
                     # Save anchors as pickle file
                     with open(anchors_file, 'wb') as f:
                         pickle.dump([anchor, anchor_tree, anchors_dict, anchor_lb], f)
+                
+                # Subsample the weak labels according to the active learning iteration
+                if self.config.subsample_labels:
+                    anchors_subsampled_file = join(self.tree_path, '{:s}_subsampled_anchors.pkl'.format(self.cloud_names[i]))
+                    if not al_iteration:
+
+                        # Select a subsample of all weak labels for active learning
+                        anchor, anchor_tree, anchors_dict, anchor_lb, anchor_inds_sub = subsample_anchors(
+                            anchor, anchors_dict, anchor_lb, config.initial_labels_per_file, config.subsample_method)
+
+                        # Save the indices of the subsampled anchors as pickle file
+                        with open(anchors_subsampled_file, 'wb') as f:
+                            pickle.dump(anchor_inds_sub, f)
+
+                    else:
+                        
+                        # Load the index list for weak labels from file
+                        with open(anchors_subsampled_file, 'rb') as f:
+                            anchor_inds_sub = pickle.load(f)
+
+                        # Select the subsample from all weak labels
+                        anchor, anchor_tree, anchors_dict, anchor_lb = select_anchors(anchor, anchors_dict, anchor_lb, anchor_inds_sub)
 
                 # Save anchors of all files in single variables
                 self.anchors += [anchor]
@@ -394,13 +427,14 @@ class Vaihingen3DWLDataset(PointCloudDataset):
                 region_lb = []
                 for aa in range(pot_anchor_inds[0].shape[0]):   # for all neighbouring anchors
                     pot_ans_idx = pot_anchor_inds[0][aa]        # get anchor id
-                    idx_r = pot_anchor_dict[pot_ans_idx][0][0]  # get corresponding points id
+                    idx_r = pot_anchor_dict[pot_ans_idx][0][0]  # get corresponding point ids
                     y = idx_r[np.in1d(idx_r,input_inds)]        # filter out points that are in subregion but not input region
                     ii_sorted = np.argsort(input_inds)          # sorted input indices
                     ypos = np.searchsorted(input_inds[ii_sorted], y)
                     idx = ii_sorted[ypos]                       # indices of subregion points in original point cloud
-                    region_idx.append(idx)
-                    region_lb.append(pot_anchor_lb[pot_ans_idx]) # weak labels based on sub_radius
+                    if idx.any():                               # check if indices exist
+                        region_idx.append(idx)                          # save the indices
+                        region_lb.append(pot_anchor_lb[pot_ans_idx])    # weak labels based on sub_radius
 
             t += [time.time()]
 
@@ -456,7 +490,7 @@ class Vaihingen3DWLDataset(PointCloudDataset):
             cen_list += [center_point]
             if self.set == 'training':
                 cl_list += [cloud_labels]
-                cla_list += [cloud_labels_all]            
+                cla_list += [cloud_labels_all]
                 region_list += [region_idx]
                 region_lb_list += [region_lb]
 
@@ -590,6 +624,8 @@ class Vaihingen3DWLDataset(PointCloudDataset):
         # Folder for the ply files
         if self.set == 'test':
             ply_path = join(self.path, self.test_path)
+        elif self.set == 'validation':
+            ply_path = join(self.path, self.validation_path)
         else:
             ply_path = join(self.path, self.train_path)
         if not exists(ply_path):

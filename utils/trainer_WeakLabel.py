@@ -124,7 +124,7 @@ class ModelTrainer:
     # Training main method
     # ------------------------------------------------------------------------------------------------------------------
 
-    def train(self, net, training_loader, val_loader, config):
+    def train(self, net, training_loader, val_loader, config, al_iteration=0):
         """
         Train the model on a particular dataset.
         """
@@ -135,8 +135,9 @@ class ModelTrainer:
 
         if config.saving:
             # Training log file
-            with open(join(config.saving_path, 'training.txt'), "w") as file:
-                file.write('epochs steps out_loss offset_loss train_accuracy time\n')
+            with open(join(config.saving_path, 'training_iteration' + str(al_iteration) + '.txt'), "w") as file:
+                anchor_num = np.sum([len(f) for f in training_loader.dataset.anchors])
+                file.write('epochs steps out_loss offset_loss train_accuracy time \tweak labels: ' + str(anchor_num) + '\n')
 
             # Killing file (simply delete this file when you want to stop the training)
             PID_file = join(config.saving_path, 'running_PID.txt')
@@ -157,6 +158,7 @@ class ModelTrainer:
         t = [time.time()]
         last_display = time.time()
         mean_dt = np.zeros(1)
+        self.al_iteration = al_iteration
 
         # Start training loop
         for epoch in range(config.max_epoch):
@@ -168,13 +170,18 @@ class ModelTrainer:
             self.step = 0
             for batch in training_loader:
 
-                # Check kill signal (running_PID.txt deleted)
-                if config.saving and not exists(PID_file):
-                    continue
-
                 ##################
                 # Processing batch
                 ##################
+
+                # Check if batch contains no subregion labels
+                # In this case we cannot calculate loss --> Skip batch
+                if not any(batch.region):
+                    continue
+
+                # Check kill signal (running_PID.txt deleted)
+                if config.saving and not exists(PID_file):
+                    continue
 
                 # New time
                 t = t[-1:]
@@ -220,17 +227,18 @@ class ModelTrainer:
                 # Console display (only one per second)
                 if (t[-1] - last_display) > 1.0:
                     last_display = t[-1]
-                    message = 'e{:03d}-i{:04d} => L={:.3f} acc={:3.0f}% / t(ms): {:5.1f} {:5.1f} {:5.1f})'
+                    message = 'e{:03d}-i{:04d} => L={:.3f} acc={:3.0f}% / t(ms): {:5.1f} {:5.1f} {:5.1f}) | al_iteration={:d}'
                     print(message.format(self.epoch, self.step,
                                          loss.item(),
                                          100*acc,
                                          1000 * mean_dt[0],
                                          1000 * mean_dt[1],
-                                         1000 * mean_dt[2]))
+                                         1000 * mean_dt[2],
+                                         self.al_iteration))
 
                 # Log file
                 if config.saving:
-                    with open(join(config.saving_path, 'training.txt'), "a") as file:
+                    with open(join(config.saving_path, 'training_iteration' + str(al_iteration) + '.txt'), "a") as file:
                         message = '{:d} {:d} {:.3f} {:.3f} {:.3f} {:.3f}\n'
                         file.write(message.format(self.epoch,
                                                   self.step,
@@ -358,7 +366,7 @@ class ModelTrainer:
                 batch.to(self.device)
 
             # Forward pass
-            self.logits, self.class_logits, self.cam = net(batch, config)
+            self.logits, _, _ = net(batch, config)
 
             # Get probs and labels
             stacked_probs = softmax(self.logits).cpu().detach().numpy()
@@ -366,7 +374,6 @@ class ModelTrainer:
             lengths = batch.lengths[0].cpu().numpy()
             in_inds = batch.input_inds.cpu().numpy()
             cloud_inds = batch.cloud_inds.cpu().numpy()
-            torch.cuda.synchronize(self.device)
 
             # Get predictions and labels per instance
             # ***************************************
@@ -388,6 +395,9 @@ class ModelTrainer:
                 predictions.append(probs)
                 targets.append(target)
                 i0 += length
+            
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize(self.device)
 
             # Average timing
             t += [time.time()]
@@ -484,7 +494,7 @@ class ModelTrainer:
 
         # Save confusions occasionally
         if config.saving and (self.epoch + 1) % config.checkpoint_gap == 0:
-            val_path = join(config.saving_path, 'val_preds_{:d}'.format(self.epoch + 1))
+            val_path = join(config.saving_path, 'val_preds_{:d}_{:d}'.format(self.al_iteration, self.epoch + 1))   
             if not exists(val_path):
                 makedirs(val_path)
             files = val_loader.dataset.files

@@ -31,6 +31,7 @@ from torch.utils.data import DataLoader
 
 from utils.config import Config
 from utils.trainer_PseudoLabel import ModelTrainer
+from utils.tester_PseudoLabel import ModelTesterPL
 from models.architectures import KPFCNN
 
 
@@ -93,8 +94,8 @@ class DALESPLConfig(Config):
     # Number of kernel points
     num_kernel_points = 15
 
-    # Radius of the input sphere (decrease value to reduce memory cost)
-    in_radius = 20
+    # Radius of the input sphere (decrease value to reduce memory cost) (default 20)
+    in_radius = 18
 
     # Size of the first subsampling grid in meter (increase value to reduce memory cost)
     first_subsampling_dl = 0.4
@@ -180,13 +181,17 @@ class DALESPLConfig(Config):
 
     # Parameters for supervised contrastive loss (start and threshold [%])
     contrast_start = 0
-    contrast_thd = 2
+    contrast_thd = 10
+
+    # Active learning parameters (label parameters are per input file)
+    active_learning_iterations = 10
+    added_labels_per_epoch = 10000
 
     # Choose model name and pseudo label log
     model_name = 'KPFCNN'
-    weak_label_log = 'Log_2022-07-07_10-41-04'
+    weak_label_log = 'Log_2022-09-12_08-20-34'
 
-    # Choose weights for class
+    # Choose weights for classes
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     weight_file = join('data', dataset[:-2], 'PseudoLabels', weak_label_log,
                        dataset[:-2] + '_t' + str(contrast_thd) + '_weight.txt')
@@ -254,71 +259,117 @@ if __name__ == '__main__':
     config = DALESPLConfig()
     if previous_training_path:
         config.load(os.path.join('results/PseudoLabel', previous_training_path))
+        
+        # Find the current active learning iteration
+        iteration_files = [f for f in os.listdir(config.saving_path) if f[:18] == 'training_iteration']
+        iteration_previous = len(iteration_files)-1
+
+        # Reset saving path
         config.saving_path = None
 
     # Get path from argument if given
     if len(sys.argv) > 1:
         config.saving_path = sys.argv[1]
 
-    # Initialize datasets
-    training_dataset = DALESPLDataset(config, set='training', use_potentials=True)
-    test_dataset = DALESPLDataset(config, set='validation', use_potentials=True)
+    # Active learning loop
+    for iteration in range(config.active_learning_iterations + 1):
 
-    # Initialize samplers
-    training_sampler = DALESPLSampler(training_dataset)
-    test_sampler = DALESPLSampler(test_dataset)
+        if previous_training_path:
+            iteration += iteration_previous
 
-    # Initialize the dataloader
-    training_loader = DataLoader(training_dataset,
+        # Initialize datasets
+        training_dataset = DALESPLDataset(config, set='training', use_potentials=True, al_iteration=iteration)
+        validation_dataset = DALESPLDataset(config, set='validation', use_potentials=True)
+
+        # Initialize dataset for testing on the training set (test_on_train=True)
+        test_dataset = DALESPLDataset(config, set='test', use_potentials=True, test_on_train=True)
+
+        # Initialize samplers
+        training_sampler = DALESPLSampler(training_dataset)
+        validation_sampler = DALESPLSampler(validation_dataset)
+        test_sampler = DALESPLSampler(test_dataset)
+
+        # Initialize the dataloader
+        training_loader = DataLoader(training_dataset,
+                                    batch_size=1,
+                                    sampler=training_sampler,
+                                    collate_fn=DALESPLCollate,
+                                    num_workers=config.input_threads,
+                                    pin_memory=True)
+        validation_loader = DataLoader(validation_dataset,
+                                batch_size=1,
+                                sampler=validation_sampler,
+                                collate_fn=DALESPLCollate,
+                                num_workers=config.input_threads,
+                                pin_memory=True)
+        test_loader = DataLoader(test_dataset,
                                  batch_size=1,
-                                 sampler=training_sampler,
+                                 sampler=test_sampler,
                                  collate_fn=DALESPLCollate,
                                  num_workers=config.input_threads,
                                  pin_memory=True)
-    test_loader = DataLoader(test_dataset,
-                             batch_size=1,
-                             sampler=test_sampler,
-                             collate_fn=DALESPLCollate,
-                             num_workers=config.input_threads,
-                             pin_memory=True)
 
-    # Calibrate samplers
-    training_sampler.calibration(training_loader, verbose=True)
-    test_sampler.calibration(test_loader, verbose=True)
+        # Calibrate samplers
+        training_sampler.calibration(training_loader, verbose=True)
+        validation_sampler.calibration(validation_loader, verbose=True)
+        test_sampler.calibration(test_loader, verbose=True)
 
-    # Optional debug functions
-    # debug_timing(training_dataset, training_loader)
-    # debug_timing(test_dataset, test_loader)
-    # debug_upsampling(training_dataset, training_loader)
+        # Optional debug functions
+        # debug_timing(training_dataset, training_loader)
+        # debug_timing(test_dataset, test_loader)
+        # debug_upsampling(training_dataset, training_loader)
 
-    print('\nModel Preparation')
-    print('*****************')
+        print('\nModel Preparation')
+        print('*****************')
 
-    # Define network model
-    t1 = time.time()
-    net = KPFCNN(config, training_dataset.label_values, training_dataset.ignored_labels)
+        # Define network model
+        t1 = time.time()
+        net = KPFCNN(config, training_dataset.label_values, training_dataset.ignored_labels)
 
-    debug = False
-    if debug:
-        print('\n*************************************\n')
-        print(net)
-        print('\n*************************************\n')
-        for param in net.parameters():
-            if param.requires_grad:
-                print(param.shape)
-        print('\n*************************************\n')
-        print("Model size %i" % sum(param.numel() for param in net.parameters() if param.requires_grad))
-        print('\n*************************************\n')
+        debug = False
+        if debug:
+            print('\n*************************************\n')
+            print(net)
+            print('\n*************************************\n')
+            for param in net.parameters():
+                if param.requires_grad:
+                    print(param.shape)
+            print('\n*************************************\n')
+            print("Model size %i" % sum(param.numel() for param in net.parameters() if param.requires_grad))
+            print('\n*************************************\n')
 
-    # Define a trainer class
-    trainer = ModelTrainer(net, config, chkp_path=chosen_chkp)
-    print('Done in {:.1f}s\n'.format(time.time() - t1))
+        # Define a trainer class
+        trainer = ModelTrainer(net, config, chkp_path=chosen_chkp)
+        print('Done in {:.1f}s\n'.format(time.time() - t1))
 
-    print('\nStart training')
-    print('**************')
+        print('\nStart training')
+        print('**************')
 
-    # Training
-    trainer.train(net, training_loader, test_loader, config)
+        # Training
+        trainer.train(net, training_loader, validation_loader, config, al_iteration=iteration)
+
+        # Get amount of used ground truth point labels and print
+        tree_path = join(training_loader.dataset.path, 'input_{:.3f}'.format(config.first_subsampling_dl))
+        labels_gt_num = 0
+        for cloud_name in training_loader.dataset.cloud_names:  
+            label_gt_file = join(tree_path, cloud_name + '_al_groundTruth_IDs.pkl')
+            with open(label_gt_file, 'rb') as f:
+                label_gt_ids = pickle.load(f)
+            labels_gt_num += len(label_gt_ids)
+        print('\n***********************************************')
+        print('Amount of ground truth point labels:  {:d}'.format(labels_gt_num))
+        print('***********************************************\n')
+
+        # Test network on training data to get point probabilities for active learning
+        # --> Ground truth point labels are added for the next iteration in cloud_segmentation_test
+        if config.active_learning_iterations and not iteration == config.active_learning_iterations:
+            torch.cuda.empty_cache()
+            chosen_chkp = os.path.join(config.saving_path, 'checkpoints/current_chkp.tar')
+            tester = ModelTesterPL(net, chkp_path=chosen_chkp)
+            tester.cloud_segmentation_test(net, test_loader, config, num_votes=1, active_learning=True)
+        
+        # Reset the checkpoint to ensure a new training network for the next iteration
+        chosen_chkp = None
 
     print('Forcing exit now')
     os.kill(os.getpid(), signal.SIGINT)

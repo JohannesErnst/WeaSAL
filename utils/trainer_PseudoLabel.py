@@ -124,7 +124,7 @@ class ModelTrainer:
     # Training main method
     # ------------------------------------------------------------------------------------------------------------------
 
-    def train(self, net, training_loader, val_loader, config):
+    def train(self, net, training_loader, val_loader, config, al_iteration=0):
         """
         Train the model on a particular dataset.
         """
@@ -134,9 +134,20 @@ class ModelTrainer:
         ################
 
         if config.saving:
-            # Training log file
-            with open(join(config.saving_path, 'training.txt'), "w") as file:
-                file.write('epochs steps out_loss offset_loss train_accuracy time\n')
+
+            # Get amount of used ground truth labels for all files 
+            tree_path = join(training_loader.dataset.path, 'input_{:.3f}'.format(config.first_subsampling_dl))
+            labels_gt_num = 0
+            for cloud_name in training_loader.dataset.cloud_names:  
+                label_gt_file = join(tree_path, cloud_name + '_al_groundTruth_IDs.pkl')
+                with open(label_gt_file, 'rb') as f:
+                    label_gt_ids = pickle.load(f)
+                labels_gt_num += len(label_gt_ids)
+
+            # Training log file        
+            with open(join(config.saving_path, 'training_iteration' + str(al_iteration) + '.txt'), "w") as file:
+                file.write('epochs steps out_loss offset_loss train_accuracy time \tground truth labels: ' + str(labels_gt_num) + '\n')
+
 
             # Killing file (simply delete this file when you want to stop the training)
             PID_file = join(config.saving_path, 'running_PID.txt')
@@ -157,6 +168,7 @@ class ModelTrainer:
         t = [time.time()]
         last_display = time.time()
         mean_dt = np.zeros(1)
+        self.al_iteration = al_iteration
 
         # Start training loop
         for epoch in range(config.max_epoch):
@@ -206,7 +218,7 @@ class ModelTrainer:
                     torch.nn.utils.clip_grad_value_(net.parameters(), config.grad_clip_norm)
                 self.optimizer.step()
 
-                torch.cuda.empty_cache()            # this line is deleted in lin et al. Keep? -jer
+                torch.cuda.empty_cache()
                 torch.cuda.synchronize(self.device)
 
                 t += [time.time()]
@@ -220,17 +232,18 @@ class ModelTrainer:
                 # Console display (only one per second)
                 if (t[-1] - last_display) > 1.0:
                     last_display = t[-1]
-                    message = 'e{:03d}-i{:04d} => L={:.3f} acc={:3.0f}% / t(ms): {:5.1f} {:5.1f} {:5.1f})'
+                    message = 'e{:03d}-i{:04d} => L={:.3f} acc={:3.0f}% / t(ms): {:5.1f} {:5.1f} {:5.1f}) | al_iteration={:d}'
                     print(message.format(self.epoch, self.step,
                                          loss.item(),
                                          100*acc,
                                          1000 * mean_dt[0],
                                          1000 * mean_dt[1],
-                                         1000 * mean_dt[2]))
+                                         1000 * mean_dt[2],
+                                         self.al_iteration))
 
                 # Log file
                 if config.saving:
-                    with open(join(config.saving_path, 'training.txt'), "a") as file:
+                    with open(join(config.saving_path, 'training_iteration' + str(al_iteration) + '.txt'), "a") as file:
                         message = '{:d} {:d} {:.3f} {:.3f} {:.3f} {:.3f}\n'
                         file.write(message.format(self.epoch,
                                                   self.step,
@@ -484,7 +497,7 @@ class ModelTrainer:
 
         # Save confusions occasionally
         if config.saving and (self.epoch + 1) % config.checkpoint_gap == 0:
-            val_path = join(config.saving_path, 'val_preds_{:d}'.format(self.epoch + 1))
+            val_path = join(config.saving_path, 'val_preds_{:d}_{:d}'.format(self.al_iteration, self.epoch + 1))
             if not exists(val_path):
                 makedirs(val_path)
             files = val_loader.dataset.files

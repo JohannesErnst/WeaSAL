@@ -84,7 +84,7 @@ class ModelTesterWL:
     # Test main methods
     # ------------------------------------------------------------------------------------------------------------------
 
-    def cloud_segmentation_test(self, net, test_loader, config, num_votes=100, debug=False):
+    def cloud_segmentation_test(self, net, test_loader, config, num_votes=100, debug=False, active_learning=False, test_on_train=False):
         """
         Test method for cloud segmentation models
         """
@@ -108,18 +108,19 @@ class ModelTesterWL:
         self.test_probs = [np.zeros((l.shape[0], nc_model)) for l in test_loader.dataset.input_labels]
 
         # Test saving path
-        if config.saving:
-            test_path = join('test/WeakLabel', config.saving_path.split('/')[-1])
-            if not exists(test_path):
-                makedirs(test_path)
-            if not exists(join(test_path, 'predictions')):
-                makedirs(join(test_path, 'predictions'))
-            if not exists(join(test_path, 'probs')):
-                makedirs(join(test_path, 'probs'))
-            if not exists(join(test_path, 'potentials')):
-                makedirs(join(test_path, 'potentials'))
-        else:
-            test_path = None
+        if not active_learning:
+            if config.saving:
+                test_path = join('test/WeakLabel', config.saving_path.split('/')[-1])
+                if not exists(test_path):
+                    makedirs(test_path)
+                if not exists(join(test_path, 'predictions')):
+                    makedirs(join(test_path, 'predictions'))
+                if not exists(join(test_path, 'probs')):
+                    makedirs(join(test_path, 'probs'))
+                if not exists(join(test_path, 'potentials')):
+                    makedirs(join(test_path, 'potentials'))
+            else:
+                test_path = None
 
         # If on validation directly compute score
         if test_loader.dataset.set == 'validation':
@@ -287,114 +288,193 @@ class ModelTesterWL:
                         all_pseudo_lbs[fn] = pseudo_lbs
 
                     # Save pseudo labels
-                    pl_path = join(test_path, '_pseudo.pickle')
-                    prob_path = join(test_path, '_probs.pickle')
-                    with open(pl_path, 'wb') as fff:
-                        pickle.dump(all_pseudo_lbs, fff)
-                    with open(prob_path, 'wb') as fff:
-                        pickle.dump(all_pseduo_probs, fff)
+                    if not active_learning:
+                        pl_path = join(test_path, '_pseudo.pickle')
+                        prob_path = join(test_path, '_probs.pickle')
+                        with open(pl_path, 'wb') as fff:
+                            pickle.dump(all_pseudo_lbs, fff)
+                        with open(prob_path, 'wb') as fff:
+                            pickle.dump(all_pseduo_probs, fff)
 
                     t2 = time.time()
                     print('Done in {:.1f} s\n'.format(t2 - t1))
 
-                    # Show vote results
-                    if test_loader.dataset.set == 'validation':
-                        print('Confusion on full clouds')
+                    # Normal test case 
+                    if not active_learning:
+
+                        # Show vote results
+                        if test_loader.dataset.set == 'validation':
+                            print('Confusion on full clouds')
+                            t1 = time.time()
+                            Confs = []
+                            for i, file_path in enumerate(test_loader.dataset.files):
+
+                                # Insert false columns for ignored labels
+                                for l_ind, label_value in enumerate(test_loader.dataset.label_values):
+                                    if label_value in test_loader.dataset.ignored_labels:
+                                        proj_probs[i] = np.insert(proj_probs[i], l_ind, 0, axis=1)
+                                    
+                                # Get the predicted labels
+                                preds = test_loader.dataset.label_values[np.argmax(proj_probs[i], axis=1)].astype(np.int32)
+
+                                # Confusion
+                                targets = test_loader.dataset.validation_labels[i]
+                                Confs += [fast_confusion(targets, preds, test_loader.dataset.label_values)]
+
+                            t2 = time.time()
+                            print('Done in {:.1f} s\n'.format(t2 - t1))
+
+                            # Regroup confusions
+                            C = np.sum(np.stack(Confs), axis=0)
+
+                            # Remove ignored labels from confusions
+                            for l_ind, label_value in reversed(list(enumerate(test_loader.dataset.label_values))):
+                                if label_value in test_loader.dataset.ignored_labels:
+                                    C = np.delete(C, l_ind, axis=0)
+                                    C = np.delete(C, l_ind, axis=1)
+
+                            IoUs = IoU_from_confusions(C)
+                            mIoU = np.mean(IoUs)
+                            s = '{:5.2f} | '.format(100 * mIoU)
+                            for IoU in IoUs:
+                                s += '{:5.2f} '.format(100 * IoU)
+                            print('-' * len(s))
+                            print(s)
+                            print('-' * len(s) + '\n')
+
+                        # Save predictions
+                        print('Saving clouds')
                         t1 = time.time()
-                        Confs = []
+                        Confs = np.zeros((config.num_classes, config.num_classes), dtype=np.int32)
                         for i, file_path in enumerate(test_loader.dataset.files):
 
-                            # Insert false columns for ignored labels
-                            for l_ind, label_value in enumerate(test_loader.dataset.label_values):
-                                if label_value in test_loader.dataset.ignored_labels:
-                                    proj_probs[i] = np.insert(proj_probs[i], l_ind, 0, axis=1)
-                                
+                            # Get points from file and add coordinate offset
+                            points = test_loader.dataset.load_evaluation_points(file_path)
+                            points = points + test_loader.dataset.coord_offset
+
                             # Get the predicted labels
                             preds = test_loader.dataset.label_values[np.argmax(proj_probs[i], axis=1)].astype(np.int32)
 
-                            # Confusion
+                            # Create error map
                             targets = test_loader.dataset.validation_labels[i]
-                            Confs += [fast_confusion(targets, preds, test_loader.dataset.label_values)]
+                            error_map = preds != targets
+                            error_map = error_map.astype('int8')
+
+                            # Save plys
+                            cloud_name = file_path.split('/')[-1]
+                            test_name = join(test_path, 'predictions', cloud_name)
+                            write_ply(test_name,
+                                    [points, preds, targets, error_map],
+                                    ['x', 'y', 'z', 'preds', 'targets', 'error'])
+                            test_name2 = join(test_path, 'probs', cloud_name)
+                            prob_names = ['_'.join(test_loader.dataset.label_to_names[label].split())
+                                        for label in test_loader.dataset.label_values]
+                            write_ply(test_name2,
+                                    [points, proj_probs[i]],
+                                    ['x', 'y', 'z'] + prob_names)
+
+                            # Save potentials
+                            pot_points = np.array(test_loader.dataset.pot_trees[i].data, copy=False)
+                            pot_name = join(test_path, 'potentials', cloud_name)
+                            pots = test_loader.dataset.potentials[i].numpy().astype(np.float32)
+                            write_ply(pot_name,
+                                    [pot_points.astype(np.float32), pots],
+                                    ['x', 'y', 'z', 'pots'])
+
+                            # Add up confusions for final confusion matrix
+                            labels = test_loader.dataset.validation_labels[i].astype(np.int32)
+                            Confs += fast_confusion(labels, preds, test_loader.dataset.label_values).astype(np.int32)
+
+                            # Save ascii preds
+                            # ascii_name = join(test_path, 'predictions', cloud_name[:-4] + '.txt')
+                            # np.savetxt(ascii_name, preds, fmt='%d')
+
+                        # Save confusion matrix
+                        cm_path = join(test_path, 'predictions')
+                        if not test_on_train:
+                            cm_name = test_loader.dataset.name + '_' + test_loader.dataset.set
+                        else:
+                            cm_name = test_loader.dataset.name + '_train'
+                        conf_matrix.plot(Confs, test_loader.dataset.label_to_names, 
+                                        cm_path, file_suffix=cm_name,
+                                        abs_vals=False, F1=True, iou=True, show=False)
 
                         t2 = time.time()
                         print('Done in {:.1f} s\n'.format(t2 - t1))
 
-                        # Regroup confusions
-                        C = np.sum(np.stack(Confs), axis=0)
+                    # Active learning case: Find anchors with high entropy sampling score 
+                    # (= insecure predictions) to add weak labels in next iteration
+                    else:
 
-                        # Remove ignored labels from confusions
-                        for l_ind, label_value in reversed(list(enumerate(test_loader.dataset.label_values))):
-                            if label_value in test_loader.dataset.ignored_labels:
-                                C = np.delete(C, l_ind, axis=0)
-                                C = np.delete(C, l_ind, axis=1)
+                        # Loop over all training files
+                        for i, file_path in enumerate(test_loader.dataset.cloud_names):
 
-                        IoUs = IoU_from_confusions(C)
-                        mIoU = np.mean(IoUs)
-                        s = '{:5.2f} | '.format(100 * mIoU)
-                        for IoU in IoUs:
-                            s += '{:5.2f} '.format(100 * IoU)
-                        print('-' * len(s))
-                        print(s)
-                        print('-' * len(s) + '\n')
+                            # Get the entropy sampling score for all points in the subsampled cloud
+                            # (+1e-12 is added to handle logarithm of probability = 0)
+                            entropy_scores = -np.sum(all_pseduo_probs[file_path+'.ply'] * 
+                                                     np.log2(all_pseduo_probs[file_path+'.ply']+1e-12), axis=1)
 
-                    # Save predictions
-                    print('Saving clouds')
-                    t1 = time.time()
-                    Confs = np.zeros((config.num_classes, config.num_classes), dtype=np.int32)
-                    for i, file_path in enumerate(test_loader.dataset.files):
+                            # Define path to the anchors file for the subsampled cloud
+                            anchors_file = join(test_loader.dataset.tree_path, '{:s}_anchors_{:s}.pkl'.format(
+                                file_path, test_loader.dataset.config.anchor_method))
 
-                        # Get points from file and add coordinate offset
-                        points = test_loader.dataset.load_evaluation_points(file_path)
-                        points = points + test_loader.dataset.coord_offset
+                            # Read pkl from path to get anchors
+                            with open(anchors_file, 'rb') as f:
+                                anchor, anchor_tree, anchors_dict, anchor_lb = pickle.load(f)
 
-                        # Get the predicted labels
-                        preds = test_loader.dataset.label_values[np.argmax(proj_probs[i], axis=1)].astype(np.int32)
+                            # Count class occurrences for all anchors
+                            label_sum = np.zeros([np.size(anchor_lb[0])], dtype=np.int)
+                            for label in anchor_lb:
+                                label_sum += anchor_lb[label]
 
-                        # Create error map
-                        targets = test_loader.dataset.validation_labels[i]
-                        error_map = preds != targets
-                        error_map = error_map.astype('int8')
+                            # Calculate a class score based on occurrences
+                            class_scores = np.exp(-label_sum/len(anchor_lb))
 
-                        # Save plys
-                        cloud_name = file_path.split('/')[-1]
-                        test_name = join(test_path, 'predictions', cloud_name)
-                        write_ply(test_name,
-                                  [points, preds, targets, error_map],
-                                  ['x', 'y', 'z', 'preds', 'targets', 'error'])
-                        test_name2 = join(test_path, 'probs', cloud_name)
-                        prob_names = ['_'.join(test_loader.dataset.label_to_names[label].split())
-                                      for label in test_loader.dataset.label_values]
-                        write_ply(test_name2,
-                                  [points, proj_probs[i]],
-                                  ['x', 'y', 'z'] + prob_names)
+                            # Loop over all anchors to get the average entropy sampling score
+                            anchor_avg_score = np.zeros(len(anchors_dict)).astype(np.float32)
+                            for idx, anchor in enumerate(anchors_dict):
 
-                        # Save potentials
-                        pot_points = np.array(test_loader.dataset.pot_trees[i].data, copy=False)
-                        pot_name = join(test_path, 'potentials', cloud_name)
-                        pots = test_loader.dataset.potentials[i].numpy().astype(np.float32)
-                        write_ply(pot_name,
-                                  [pot_points.astype(np.float32), pots],
-                                  ['x', 'y', 'z', 'pots'])
+                                # Find the indices (for the subsampled cloud) of the points in the anchor
+                                anchor_point_ids = np.squeeze(anchors_dict[anchor][0])
 
-                        # Add up confusions for final confusion matrix
-                        labels = test_loader.dataset.validation_labels[i].astype(np.int32)
-                        Confs += fast_confusion(labels, preds, test_loader.dataset.label_values).astype(np.int32)
+                                # Grab the entropy sampling scores for the points in the anchor
+                                anchor_entropy_score = entropy_scores[anchor_point_ids]
 
-                        # Save ascii preds
-                        # ascii_name = join(test_path, 'predictions', cloud_name[:-4] + '.txt')
-                        # np.savetxt(ascii_name, preds, fmt='%d')
+                                # Calculate the class weighting score for the anchor based on all occuring classes
+                                anchor_class_score = np.matmul(anchor_lb[idx], class_scores)
 
-                    # Save confusion matrix
-                    cm_path = join(test_path, 'predictions')
-                    cm_name = test_loader.dataset.name + '_' + test_loader.dataset.set
-                    conf_matrix.plot(Confs, test_loader.dataset.label_to_names, 
-                                     cm_path, file_suffix=cm_name,
-                                     abs_vals=False, F1=True, iou=True, show=False)
+                                # Calcualte average entropy sampling score multiplied with weighting score for the anchor
+                                anchor_avg_score[anchor] = np.mean(anchor_entropy_score)*anchor_class_score
 
-                    t2 = time.time()
-                    print('Done in {:.1f} s\n'.format(t2 - t1))
+                            # Sort anchors according to their entropy sampling score (descending) and save indices
+                            sort_ids = np.argsort(-anchor_avg_score)
+
+                            # Load the indices of the anchors of the previous iteration
+                            anchors_subsampled_file = join(test_loader.dataset.tree_path, '{:s}_subsampled_anchors.pkl'.format(file_path))
+                            with open(anchors_subsampled_file, 'rb') as f:
+                                anchor_inds_sub = pickle.load(f)
+                            
+                            # Remove already used anchors from the sorted anchor list
+                            for used_anchor in anchor_inds_sub:
+                                sort_ids = np.delete(sort_ids, np.where(sort_ids == used_anchor))
+
+                            # Select the anchor indices with the highest entropy sampling score
+                            if len(sort_ids) > test_loader.dataset.config.added_labels_per_epoch:
+                                high_score_ids = sort_ids[0:test_loader.dataset.config.added_labels_per_epoch]
+                            else:
+                                raise ValueError('Not enough weak labels left for the next iteration')
+
+                            # Add the high entropy sampling score anchor ids to the index list
+                            anchor_inds_sub = np.append(anchor_inds_sub, high_score_ids)
+
+                            # Save the updated indices of the subsampled anchors as pickle file
+                            with open(anchors_subsampled_file, 'wb') as f:
+                                pickle.dump(anchor_inds_sub, f)
 
             test_epoch += 1
+
+            # Empty cache for more memory
+            torch.cuda.empty_cache()
 
             # Break when reaching number of desired votes
             if last_min > num_votes:

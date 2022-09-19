@@ -50,7 +50,7 @@ from utils.anchors import *
 class DALESWLDataset(PointCloudDataset):
     """Class to handle DALES dataset with weak region-labels (WL)."""
 
-    def __init__(self, config, set='training', use_potentials=True, load_data=True):
+    def __init__(self, config, set='training', use_potentials=True, load_data=True, test_on_train=False, al_iteration=0):
         """
         This dataset is small enough to be stored in-memory, so load all point clouds here
         """
@@ -98,11 +98,14 @@ class DALESWLDataset(PointCloudDataset):
 
         # Path of the training files and test files
         self.train_path = 'Training'
+        self.validation_path = 'Validation'
         self.test_path = 'Test'
 
         # List of files to process
         if self.set == 'test':
             ply_path = join(self.path, self.test_path)
+        elif self.set == 'validation':
+            ply_path = join(self.path, self.validation_path)
         else:
             ply_path = join(self.path, self.train_path)
 
@@ -115,22 +118,16 @@ class DALESWLDataset(PointCloudDataset):
                             '5150_54340','5160_54330','5165_54390','5165_54395',
                             '5180_54435','5180_54485','5185_54390','5185_54485',
                             '5190_54400',
-                            '5080_54435','5085_54320','5095_54440','5095_54455',
-                            '5100_54495','5105_54405','5105_54460','5110_54320',
-                            '5110_54460','5110_54475','5110_54495','5115_54480',
-                            '5130_54355','5135_54495','5140_54445','5145_54340',
-                            '5145_54405','5145_54460','5145_54470','5145_54480',
-                            '5150_54340','5160_54330','5165_54390','5165_54395',
-                            '5180_54435','5180_54485','5185_54390','5185_54485',
-                            '5190_54400',
                             'test_5080_54400','test_5080_54470','test_5100_54440',
                             'test_5100_54490','test_5120_54445','test_5135_54430',
                             'test_5135_54435','test_5140_54390','test_5150_54325',
                             'test_5155_54335','test_5175_54395']
-        self.all_splits = list(range(0,69))
-        self.validation_split = list(range(29,58))
-        self.test_split = list(range(58,69))
-
+        self.all_splits = list(range(0,40))
+        self.validation_split = 28
+        if not test_on_train:                       # normal test dataset
+            self.test_split = list(range(29,40))
+        else:                                       # for active learning set 'train' as test dataset
+            self.test_split = list(range(0,28))
 
         # Number of models used per epoch
         if self.set == 'training':
@@ -158,26 +155,26 @@ class DALESWLDataset(PointCloudDataset):
         self.files = []
         for i, f in enumerate(self.cloud_names):
             if self.set == 'training':
-                if self.all_splits[i] not in self.validation_split and self.all_splits[i] not in self.test_split:
+                if self.all_splits[i] != self.validation_split and self.all_splits[i] not in self.test_split:
                     self.files += [join(ply_path, f + '.ply')]
             elif self.set == 'test':
                 if self.all_splits[i] in self.test_split:
                     self.files += [join(ply_path, f + '.ply')]
             elif self.set in ['validation', 'ERF']:
-                if self.all_splits[i] in self.validation_split:
+                if self.all_splits[i] == self.validation_split:
                     self.files += [join(ply_path, f + '.ply')]
             else:
                 raise ValueError('Unknown set for DALESWL data: ', self.set)
 
         if self.set == 'training':
             self.cloud_names = [f for i, f in enumerate(self.cloud_names)
-                                if self.all_splits[i] not in self.validation_split and self.all_splits[i] not in self.test_split]
+                                if self.all_splits[i] != self.validation_split and self.all_splits[i] not in self.test_split]
         elif self.set == 'test':
             self.cloud_names = [f for i, f in enumerate(self.cloud_names)
                                 if self.all_splits[i] in self.test_split]
         elif self.set in ['validation', 'ERF']:
             self.cloud_names = [f for i, f in enumerate(self.cloud_names)
-                                if self.all_splits[i] in self.validation_split]
+                                if self.all_splits[i] == self.validation_split]
 
         if 0 < self.config.first_subsampling_dl <= 0.01:
             raise ValueError('subsampling_parameter too low (should be over 1 cm')
@@ -210,11 +207,11 @@ class DALESWLDataset(PointCloudDataset):
             for i, tree in enumerate(self.input_trees):
                 print('Preparing anchors and weak labels (' +
                       str(i+1) + '/' + str(len(self.input_trees)) + ')')
-                anchors_file = join(self.tree_path, '{:s}_anchors.pkl'.format(self.cloud_names[i]))
+                anchors_file = join(self.tree_path, '{:s}_anchors_{:s}.pkl'.format(self.cloud_names[i], config.anchor_method))           
 
                 # Check if anchors have already been computed
                 if exists(anchors_file):
-                    print('Found anchors for cloud {:s}, subsampled at {:.3f}'.format(self.cloud_names[i], self.config.first_subsampling_dl))
+                    print('Found anchors for cloud {:s}, subsampled at {:.3f}\n'.format(self.cloud_names[i], self.config.first_subsampling_dl))
                     
                     # Read pkl to get anchors
                     with open(anchors_file, 'rb') as f:
@@ -227,12 +224,35 @@ class DALESWLDataset(PointCloudDataset):
                         tree, anchor, self.input_labels[i], config.sub_radius, config.num_classes)
 
                     # Update subregion information according to overlaps
-                    anchor, anchor_tree, anchors_dict, anchor_lb = update_anchors(
-                        tree, anchor, anchor_tree, anchors_dict, anchor_lb, config.sub_radius)
+                    if not self.config.subsample_labels:
+                        anchor, anchor_tree, anchors_dict, anchor_lb = update_anchors(
+                            tree, anchor, anchor_tree, anchors_dict, anchor_lb, config.sub_radius)
 
                     # Save anchors as pickle file
                     with open(anchors_file, 'wb') as f:
                         pickle.dump([anchor, anchor_tree, anchors_dict, anchor_lb], f)
+
+                # Subsample the weak labels according to the active learning iteration
+                if self.config.subsample_labels:
+                    anchors_subsampled_file = join(self.tree_path, '{:s}_subsampled_anchors.pkl'.format(self.cloud_names[i]))
+                    if not al_iteration:
+
+                        # Select a subsample of all weak labels for active learning
+                        anchor, anchor_tree, anchors_dict, anchor_lb, anchor_inds_sub = subsample_anchors(
+                            anchor, anchors_dict, anchor_lb, config.initial_labels_per_file, config.subsample_method)
+
+                        # Save the indices of the subsampled anchors as pickle file
+                        with open(anchors_subsampled_file, 'wb') as f:
+                            pickle.dump(anchor_inds_sub, f)
+
+                    else:
+                        
+                        # Load the index list for weak labels from file
+                        with open(anchors_subsampled_file, 'rb') as f:
+                            anchor_inds_sub = pickle.load(f)
+
+                        # Select the subsample from all weak labels
+                        anchor, anchor_tree, anchors_dict, anchor_lb = select_anchors(anchor, anchors_dict, anchor_lb, anchor_inds_sub)
 
                 # Save anchors of all files in single variables
                 self.anchors += [anchor]
@@ -413,13 +433,14 @@ class DALESWLDataset(PointCloudDataset):
                 region_lb = []
                 for aa in range(pot_anchor_inds[0].shape[0]):   # for all neighbouring anchors
                     pot_ans_idx = pot_anchor_inds[0][aa]        # get anchor id
-                    idx_r = pot_anchor_dict[pot_ans_idx][0][0]  # get corresponding points id
+                    idx_r = pot_anchor_dict[pot_ans_idx][0][0]  # get corresponding point ids
                     y = idx_r[np.in1d(idx_r,input_inds)]        # filter out points that are in subregion but not input region
                     ii_sorted = np.argsort(input_inds)          # sorted input indices
                     ypos = np.searchsorted(input_inds[ii_sorted], y)
                     idx = ii_sorted[ypos]                       # indices of subregion points in original point cloud
-                    region_idx.append(idx)
-                    region_lb.append(pot_anchor_lb[pot_ans_idx]) # weak labels based on sub_radius
+                    if idx.any():                               # check if indices exist
+                        region_idx.append(idx)                          # save the indices
+                        region_lb.append(pot_anchor_lb[pot_ans_idx])    # weak labels based on sub_radius
 
             t += [time.time()]
 
@@ -602,6 +623,8 @@ class DALESWLDataset(PointCloudDataset):
         # Folder for the ply files
         if self.set == 'test':
             ply_path = join(self.path, self.test_path)
+        elif self.set == 'validation':
+            ply_path = join(self.path, self.validation_path)
         else:
             ply_path = join(self.path, self.train_path)
         if not exists(ply_path):
@@ -612,10 +635,16 @@ class DALESWLDataset(PointCloudDataset):
         self.coord_offset = np.vstack((data['x'][0], data['y'][0], data['z'][0])).T
 
         # Assign training/validation and test cloud names
+        train_split = []
+        for split in self.all_splits:
+            if split != self.validation_split and split not in self.test_split:
+                train_split.append(split)
         if self.set == 'test':
-            cloud_names_sort = [self.cloud_names[i] for i in self.test_split]     
+            cloud_names_sort = [self.cloud_names[i] for i in self.test_split]
+        elif self.set == 'validation':
+            cloud_names_sort = [self.cloud_names[self.validation_split]]
         else:
-            cloud_names_sort = self.cloud_names[0:self.test_split[0]]
+            cloud_names_sort = [self.cloud_names[i] for i in train_split]
 
         # Prepare all clouds
         for cloud_name in cloud_names_sort:

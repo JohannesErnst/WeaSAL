@@ -1,11 +1,9 @@
 # Weakly Supervised Active Learning
-*WORK IN PROGRESS*
+Combination of weakly supervised learning and active learning for 3D point cloud classification with minimum labeling effort.
 
-Combination of Weakly Supervised Learning and Active Learning for 3D Point Cloud Classification with Minimum Labeling Effort.
+![Overview](https://user-images.githubusercontent.com/51992212/190665704-7aa8752e-6d4f-4e0a-9475-15954c883007.png)
 
-![Overview](https://user-images.githubusercontent.com/51992212/178697796-4d9249c8-599e-4803-9ec8-cb0ae0f163e2.png)
-
-Credit: Lin, Y., G. Vosselman, and M. Y. Yang (2022). "Weakly supervised semantic segmentation of airborne laser scanning point clouds", Figure 1
+Graphical overview of the WeaSAL network workflow (adapted from Lin, Y., G. Vosselman, and M. Y. Yang (2022), "Weakly supervised semantic segmentation of airborne laser scanning point clouds", Figure 1)
 
 
 ## Installation
@@ -13,16 +11,18 @@ Will be added in the future (`INSTALL.md`). Please follow the installation instr
 
 
 ## Overview
-This repository includes the processing code for training a classification network with weak-region labels and the subsequent segmentation network trained on pseudo labels. 
+This repository includes the processing code for training a classification network with weak-region labels and the subsequent segmentation network trained on pseudo-labels in [PyTorch](https://pytorch.org/).
 
-As a Convolutional Neural Network, Kernel Point Convolution ([KPConv](https://arxiv.org/abs/1904.08889)) is used:
+As a Convolutional Neural Network, Kernel Point Convolution ([KPConv](https://arxiv.org/abs/1904.08889)) is used:<br/>
 https://github.com/HuguesTHOMAS/KPConv-PyTorch
 
-The weak supervision approach follows Multi-Path Region Mining ([MPRM](https://arxiv.org/abs/2003.13035)):
+The weak supervision approach follows Multi-Path Region Mining ([MPRM](https://arxiv.org/abs/2003.13035)):<br/>
 https://github.com/plusmultiply/mprm
 
-Main structure for refined Weakly Supervised Semantic Segmentation ([Weak_ALS](https://www.sciencedirect.com/science/article/pii/S0924271622000661)) is based on:
+Main structure for refined Weakly Supervised Semantic Segmentation ([Weak_ALS](https://www.sciencedirect.com/science/article/pii/S0924271622000661)) is based on:<br/>
 https://github.com/yaping222/Weak_ALS
+
+Scripts for training and testing on two datasets are provided, namely *Vaihingen3D* and *DALES*.
 
 
 ## How to use
@@ -44,12 +44,18 @@ Create a ```data/``` folder in ```WeaSAL/``` directory that holds the datasets (
     .
     .
 ```
-- Training the network on weak subcloud labels (```train_Vaihingen3D_WeakLabel.py``` or ```train_DALES_WeakLabel.py```)
-- Visualizing convergence of the training (```plot_convergence.py```)
-- Generating point-wise pseudo labels (```test_models.py``` with weak-supervision network input and training files)
-- Performing pseudo label refinement (```pseudoLabel_refinement.py```)
-- Training the network on pseudo labels (```train_Vaihingen3D_PseudoLabel.py``` or ```train_DALES_PseudoLabel.py```)
-- Testing the network on the test set (```test_models.py``` with pseudo-supervision network input and test files)
+Workflow in short:<br/>
+`train_dataset_WeakLabel.py` &rarr; `test_models.py` &rarr; `pseudoLabel_refinement.py` &rarr; `train_dataset_PseudoLabel.py` &rarr; `test_models.py`
+
+Workflow in full:
+- Training the network on weak subcloud labels (```train_Vaihingen3D_WeakLabel.py``` or ```train_DALES_WeakLabel.py```). This will create a "results" folder inside the WeaSAL directory where all training results are stored. 
+- Visualizing convergence of the training (```plot_convergence.py```) to plot runtime, overall accuracy on the validation set and loss. Output can be set up inside the script. The script can be used for weak and pseudo-label training results.
+- Generating point-wise pseudo-labels (```test_models.py``` with weak-supervision network and training files as input). This will create a "test" folder inside the WeaSAL directory where all test results are stored. Parameters have to be set in accordance to the training log file and the input files.
+- Performing pseudo-label refinement (```pseudoLabel_refinement.py```) to improve the input for the following segmentation network. Creates new pseudo-label and class weighting file (as .txt) inside the corresponding data folder. Parameters have to be set in accordance to the log file and the dataset.
+- Training the network on the refined pseudo-labels (```train_Vaihingen3D_PseudoLabel.py``` or ```train_DALES_PseudoLabel.py```). Output is stored inside the "results" folder. 
+- Testing the network on the test set (```test_models.py``` with pseudo-supervision network and test files as input). Final testing output is stored inside the "test" folder. Parameters have to be set in accordance to the training log file and the input files.
+
+Elaborate comments can be found inside the code.
 
 
 ## License
