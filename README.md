@@ -3,11 +3,11 @@ Combination of weakly supervised learning and active learning for 3D point cloud
 
 ![Overview](https://user-images.githubusercontent.com/51992212/190665704-7aa8752e-6d4f-4e0a-9475-15954c883007.png)
 
-Graphical overview of the WeaSAL network workflow (adapted from Lin, Y., G. Vosselman, and M. Y. Yang (2022), "Weakly supervised semantic segmentation of airborne laser scanning point clouds", Figure 1)
+Graphical overview of the WeaSAL network workflow (adapted from Lin, Y., G. Vosselman, and M. Y. Yang (2022): "Weakly supervised semantic segmentation of airborne laser scanning point clouds", Figure 1)
 
 
 ## Installation
-Will be added in the future (`INSTALL.md`). Please follow the installation instructions for KPConv (PyTorch) for now.
+Please read the `INSTALL.md` file for installation instructions.
 
 
 ## Overview
@@ -50,10 +50,14 @@ Workflow in short:<br/>
 Workflow in full:
 - Training the network on weak subcloud labels (```train_Vaihingen3D_WeakLabel.py``` or ```train_DALES_WeakLabel.py```). This will create a "results" folder inside the WeaSAL directory where all training results are stored. 
 - Visualizing convergence of the training (```plot_convergence.py```) to plot runtime, overall accuracy on the validation set and loss. Output can be set up inside the script. The script can be used for weak and pseudo-label training results.
-- Generating point-wise pseudo-labels (```test_models.py``` with weak-supervision network and training files as input). This will create a "test" folder inside the WeaSAL directory where all test results are stored. Parameters have to be set in accordance to the training log file and the input files.
+- Generating point-wise pseudo-labels (```test_models.py``` with weak-supervision network and training files as input). This will create a "test" folder inside the WeaSAL directory where all test results are stored. Parameters have to be set in accordance to the training log file and the input files. Use:<br/>
+  - `chosen_log = 'Log_####'` to your specific weak-supervision log created during the training or use the `chosen_log = 'last_####'` option to automatically retreive the last created log.<br/>
+  - `set = 'train'` to create pseudo-labels for the training set.<br/>
 - Performing pseudo-label refinement (```pseudoLabel_refinement.py```) to improve the input for the following segmentation network. Creates new pseudo-label and class weighting file (as .txt) inside the corresponding data folder. Parameters have to be set in accordance to the log file and the dataset.
 - Training the network on the refined pseudo-labels (```train_Vaihingen3D_PseudoLabel.py``` or ```train_DALES_PseudoLabel.py```). Output is stored inside the "results" folder. 
-- Testing the network on the test set (```test_models.py``` with pseudo-supervision network and test files as input). Final testing output is stored inside the "test" folder. Parameters have to be set in accordance to the training log file and the input files.
+- Testing the network on the test set (```test_models.py``` with pseudo-supervision network and test files as input). Final testing output is stored inside the "test" folder. Parameters have to be set in accordance to the training log file and the input files. Use:<br/>
+  - `chosen_log = 'Log_####'` to your specific pseudo-supervision log created during the training or use the `chosen_log = 'last_####'` option to automatically retreive the last created log.<br/>
+  - `set = 'test'` to test the network on the testing set.<br/>
 
 Elaborate comments can be found inside the code.
 
