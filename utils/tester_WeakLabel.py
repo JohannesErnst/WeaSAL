@@ -422,13 +422,18 @@ class ModelTesterWL:
                             with open(anchors_file, 'rb') as f:
                                 anchor, anchor_tree, anchors_dict, anchor_lb = pickle.load(f)
 
-                            # Count class occurrences for all anchors
+                            # Load the indices of the anchors of the previous iteration
+                            anchors_subsampled_file = join(test_loader.dataset.tree_path, '{:s}_subsampled_anchors.pkl'.format(file_path))
+                            with open(anchors_subsampled_file, 'rb') as f:
+                                anchor_inds_sub = pickle.load(f)
+
+                            # Count class occurrences for all used anchors
                             label_sum = np.zeros([np.size(anchor_lb[0])], dtype=np.int)
-                            for label in anchor_lb:
+                            for label in anchor_inds_sub:
                                 label_sum += anchor_lb[label]
 
                             # Calculate a class score based on occurrences
-                            class_scores = np.exp(-label_sum/len(anchor_lb))
+                            class_scores = np.exp(-label_sum/len(anchor_inds_sub))
 
                             # Loop over all anchors to get the average entropy sampling score
                             anchor_avg_score = np.zeros(len(anchors_dict)).astype(np.float32)
@@ -448,11 +453,6 @@ class ModelTesterWL:
 
                             # Sort anchors according to their entropy sampling score (descending) and save indices
                             sort_ids = np.argsort(-anchor_avg_score)
-
-                            # Load the indices of the anchors of the previous iteration
-                            anchors_subsampled_file = join(test_loader.dataset.tree_path, '{:s}_subsampled_anchors.pkl'.format(file_path))
-                            with open(anchors_subsampled_file, 'rb') as f:
-                                anchor_inds_sub = pickle.load(f)
                             
                             # Remove already used anchors from the sorted anchor list
                             for used_anchor in anchor_inds_sub:

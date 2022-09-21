@@ -134,8 +134,8 @@ class Vaihingen3DWLConfig(Config):
     # Training parameters
     #####################
 
-    # Maximal number of epochs (default 45)
-    max_epoch = 50
+    # Maximal number of epochs (default 50)
+    max_epoch = 75
 
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
@@ -146,7 +146,7 @@ class Vaihingen3DWLConfig(Config):
     # Number of batch (or number of input spheres)
     batch_num = 3
 
-    # Number of steps per epochs (default 500)
+    # Number of steps per epochs (default 400)
     epoch_steps = 400
 
     # Number of validation examples per epoch (default 200)
@@ -156,24 +156,24 @@ class Vaihingen3DWLConfig(Config):
     checkpoint_gap = 25
 
     # Augmentations
-    augment_scale_anisotropic = True
-    augment_symmetries = [True, True, False]
+    augment_scale_anisotropic = False
+    augment_symmetries = [False, False, False]
     augment_rotation = 'vertical'
-    augment_scale_min = 0.8
-    augment_scale_max = 1.2
-    augment_noise = 0.04
+    augment_scale_min = 1
+    augment_scale_max = 1
+    augment_noise = 0.001
 
     # Choose weights for class
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 
     # Enable dropout
-    dropout = 0.5
+    dropout = 0
 
     # Active learning parameters (label parameters are per input file)
     active_learning_iterations = 10
     initial_labels_per_file = 100
     subsample_method = 'balanced'
-    added_labels_per_epoch = int(initial_labels_per_file*0.5)
+    added_labels_per_epoch = 50
 
     # Decide whether to subsample weak labels 
     # --> must be True for active_learning_iterations > 0
