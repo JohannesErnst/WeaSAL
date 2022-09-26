@@ -882,17 +882,18 @@ class channel_att(nn.Module):
         return merged
 
 
-class dual_att(nn.Module):
+class multi_path_att(nn.Module):
 
     def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, config):
         """
-        Initialize a dual attention module (point-wise attention module in paper).
+        Initialize a multi-path attention module. This block combines no-attention, spatial-attention,
+        channel-attention and point-wise attention blocks.
         :param in_dim: dimension input features
         :param out_dim: dimension output features
         :param radius: current radius of convolution
         :param config: parameters
         """
-        super(dual_att, self).__init__()
+        super(multi_path_att, self).__init__()
 
         self.bn_momentum = config.batch_norm_momentum
         self.use_bn = config.use_batch_norm
@@ -909,7 +910,7 @@ class dual_att(nn.Module):
         self.sa_unary = UnaryBlock(out_dim, fdim, self.use_bn, self.bn_momentum)
         self.ca_unary = UnaryBlock(out_dim, fdim, self.use_bn, self.bn_momentum)
         self.no_unary = UnaryBlock(in_dim, fdim, self.use_bn, self.bn_momentum)
-        self.psa_unary = UnaryBlock(out_dim, fdim, self.use_bn, self.bn_momentum)
+        self.pa_unary = UnaryBlock(out_dim, fdim, self.use_bn, self.bn_momentum)
         
         self.dropout = config.dropout
         if self.dropout:
@@ -920,15 +921,15 @@ class dual_att(nn.Module):
 
         sa, sa_x = self.sa_f(features, batch)
         ca = self.ca_f(features, batch)
-        psa = torch.cat((features, sa_x), dim=1)
-        psa = self.simple1(psa, batch)
+        pa = torch.cat((features, sa_x), dim=1)
+        pa = self.simple1(pa, batch)
             
         sa_u = self.sa_unary(sa, batch)
         ca_u = self.ca_unary(ca, batch)
         no_u = self.no_unary(features, batch)
-        psa_u = self.psa_unary(psa, batch)
+        pa_u = self.pa_unary(pa, batch)
 
-        return sa_u, ca_u, no_u, psa_u
+        return sa_u, ca_u, no_u, pa_u
 
 
 class global_average_block(nn.Module):

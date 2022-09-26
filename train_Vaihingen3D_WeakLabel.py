@@ -135,7 +135,7 @@ class Vaihingen3DWLConfig(Config):
     #####################
 
     # Maximal number of epochs (default 50)
-    max_epoch = 75
+    max_epoch = 50
 
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
@@ -156,18 +156,18 @@ class Vaihingen3DWLConfig(Config):
     checkpoint_gap = 25
 
     # Augmentations
-    augment_scale_anisotropic = False
-    augment_symmetries = [False, False, False]
+    augment_scale_anisotropic = True
+    augment_symmetries = [True, True, False]
     augment_rotation = 'vertical'
-    augment_scale_min = 1
-    augment_scale_max = 1
-    augment_noise = 0.001
+    augment_scale_min = 0.8
+    augment_scale_max = 1.2
+    augment_noise = 0.04
 
     # Choose weights for class
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 
     # Enable dropout
-    dropout = 0
+    dropout = 0.5
 
     # Active learning parameters (label parameters are per input file)
     active_learning_iterations = 10

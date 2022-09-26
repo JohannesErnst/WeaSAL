@@ -697,8 +697,8 @@ def experiment_active_learning_compare():
     Just return the log path (like 'results/WeakLabel/Log_2020-04-04_10-04-42' for example) you want to compare.
     """
 
-    # Define active learing log by date
-    log = 'Log_2022-09-12_08-20-34'
+    # Define active learning log by date
+    log = 'Log_2022-09-25_15-22-56'
 
     # Give log name for legend
     log_name = ['V3D WL baseline']

@@ -575,7 +575,7 @@ class KPFCNN_mprm(nn.Module):
                 r *= 2
                 out_dim *= 2
         
-        self.multi_att = dual_att('attention', out_dim, out_dim, r, layer, config)
+        self.multi_att = multi_path_att('attention', out_dim, out_dim, r, layer, config)
         self.ele_head = ele_att('ele_attention', 2, out_dim, r, layer, config)
         self.no_ga = global_average_block('ga1', config.num_classes, config.num_classes, layer, config)
         self.da_ga = global_average_block('ga2', config.num_classes, config.num_classes, layer, config)
@@ -679,28 +679,29 @@ class KPFCNN_mprm(nn.Module):
         x = self.ele_head(x, ele_down, batch)
             
         # Combine attention modules and save logits
-        spa_att, cha_att, no_att, dual_att = self.multi_att(x, batch)
+        spa_att, cha_att, no_att, poi_att = self.multi_att(x, batch)
 
+        # Perform global average pooling
         no_att_cla = self.no_ga(no_att, batch)
-        dual_att_cla = self.da_ga(dual_att, batch)
+        poi_att_cla = self.da_ga(poi_att, batch)
         spa_att_cla = self.spa_ga(spa_att, batch)
         cha_att_cla = self.cha_ga(cha_att, batch)  
-        
-        cla_logits = [no_att_cla, dual_att_cla, spa_att_cla, cha_att_cla]
+        cla_logits = [no_att_cla, poi_att_cla, spa_att_cla, cha_att_cla]
         
         # Loop over consecutive decoder blocks
         for block_i, block_op in enumerate(self.decoder_blocks):
             no_att = block_op(no_att, batch)
-            dual_att = block_op(dual_att, batch)
+            poi_att = block_op(poi_att, batch)
             spa_att = block_op(spa_att, batch)
             cha_att = block_op(cha_att, batch)
 
         # Element-wise maximum to get pseudo labels
-        x = torch.max(no_att, dual_att)
+        x = torch.max(no_att, poi_att)
         x = torch.max(x, spa_att)
         x = torch.max(x, cha_att)
             
-        cam = [no_att, dual_att, spa_att, cha_att]
+        # Grab point class activation maps
+        cam = [no_att, poi_att, spa_att, cha_att]
         
         return x, cla_logits, cam
    
@@ -759,7 +760,7 @@ class KPFCNN_mprm(nn.Module):
                 regions = regions_all[ri]
                 logits = cam_all[:,start_id:end_id,:]
 
-                # Retrieve ground truth weak labels for the whole input sphere
+                # Retrieve ground-truth weak labels for all subspheres within the whole input sphere
                 all_cls_lbs.append(np.stack(regions_lb[ri]).astype('float32'))
 
                 # Retrieve weak labels of each subregion based on output logits (predicted)
