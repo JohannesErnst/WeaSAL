@@ -86,11 +86,12 @@ class DALESWLConfig(Config):
     # Number of kernel points
     num_kernel_points = 15
 
-    # Radius of the input sphere (decrease value to reduce memory cost) (default 20)
+    # Radius of the input sphere (decrease value to reduce memory cost)
     in_radius = 16
 
     # Radius of the subcloud for weak labels (smaller means more labels but better results)
-    # Increse to reduce memory cost (default 5) (delete old _anchors.pkl files in input_xy/ when changing)
+    # Increse to reduce memory cost
+    # NOTE: Delete old _anchors.pkl files in input_xy/ when changing
     sub_radius = 5
 
     # Size of the first subsampling grid in meter (increase value to reduce memory cost)
@@ -134,7 +135,7 @@ class DALESWLConfig(Config):
     # Training parameters
     #####################
 
-    # Maximal number of epochs (default 60)
+    # Maximal number of epochs
     max_epoch = 150
 
     # Learning rate management (standard value is 1e-2)
@@ -146,10 +147,10 @@ class DALESWLConfig(Config):
     # Number of batch (or number of input spheres)
     batch_num = 2
 
-    # Number of steps per epochs (default 300)
+    # Number of steps per epochs
     epoch_steps = 100
 
-    # Number of validation examples per epoch (default 200)
+    # Number of validation examples per epoch
     validation_size = 200
 
     # Number of epoch between each checkpoint
