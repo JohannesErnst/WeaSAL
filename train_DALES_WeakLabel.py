@@ -167,18 +167,17 @@ class DALESWLConfig(Config):
     # Choose weights for class
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 
-    # Enable dropout
-    dropout = 0.5
-
     # Active learning parameters (label parameters are per input file)
+    # NOTE: Delete old anchor files when switching active learning on or of
+    # (i.e. when switching "active_learning_iterations = 0" to > 0 or vice versa)
     active_learning_iterations = 10
     initial_labels_per_file = 1000
     subsample_method = 'balanced'
     added_labels_per_epoch = 500
 
     # Decide whether to subsample weak labels 
-    # --> must be True for active_learning_iterations > 0
-    subsample_labels = True
+    # NOTE: Must be True for active_learning_iterations > 0
+    subsample_labels = True if active_learning_iterations > 0 else False
 
     # Other parameters
     model_name = 'KPFCNN_mprm'

@@ -177,7 +177,7 @@ class DALESPLConfig(Config):
     augment_color = 0.7
 
     # Enable dropout
-    dropout = 0
+    dropout = 0.5
 
     # Parameters for supervised contrastive loss (start and threshold [%])
     contrast_start = 0

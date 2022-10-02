@@ -343,7 +343,7 @@ class KPFCNN(nn.Module):
             x = block_op(x, batch)
 
         if self.dropout:
-            sa = self.droplayer(x)
+            x = self.droplayer(x)
 
         # Head of network
         x = self.head_mlp(x, batch)
@@ -409,7 +409,7 @@ class KPFCNN(nn.Module):
             whether they are negative (of different classes) or positive samples 
             (of the same class). With this metric the contrastive loss is calculated.
             :param outputs: logits predicted by the network
-            :param labels: ground truth pseudo labels
+            :param labels: pseudo labels
             :param threshold: threshold for ignoring uncertain labels
             :return: loss
             """
@@ -430,11 +430,12 @@ class KPFCNN(nn.Module):
             pseudo_logits = prob.max(1)[0]
 
             # Gather all labeled points and confident unlabeled points
+            # (label > 10 means the point is unlabeled)
             label_id = labels < 10
             certain_label = pseudo_logits > threshold
             certain_label = (certain_label + label_id) > 0
 
-            # Get the valid pseudo labels
+            # Update unlabeled points with confident predictions (argmax) and save the valid indices
             pseudo_lbs = torch.argmax(prob, dim=1)
             pseudo_lbs[label_id] = labels[label_id] 
             all_valid_idx = torch.where(certain_label)[0]

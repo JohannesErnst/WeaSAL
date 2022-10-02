@@ -911,11 +911,6 @@ class multi_path_att(nn.Module):
         self.ca_unary = UnaryBlock(out_dim, fdim, self.use_bn, self.bn_momentum)
         self.no_unary = UnaryBlock(in_dim, fdim, self.use_bn, self.bn_momentum)
         self.pa_unary = UnaryBlock(out_dim, fdim, self.use_bn, self.bn_momentum)
-        
-        self.dropout = config.dropout
-        if self.dropout:
-            self.droplayer = nn.Dropout(p=config.dropout)
-
 
     def forward(self, features, batch):
 
