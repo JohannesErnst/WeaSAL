@@ -402,7 +402,7 @@ class ModelTesterPL:
                             cloud_name = test_loader.dataset.cloud_names[i]
                             label_gt_file = join(tree_path, cloud_name + '_al_groundTruth_IDs.pkl')
 
-                            # Calculate a class score for each point based the original weighting file
+                            # Calculate a class score for each point based on the original weighting file
                             class_scores = np.exp(config.class_w[np.argmax(all_probs[file_path+'.ply'], axis=1)])
 
                             # Combine entropy and class score to one score

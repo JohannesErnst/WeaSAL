@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 from os.path import isfile, join, exists
 from os import listdir, remove, getcwd
 from sklearn.metrics import confusion_matrix
+from natsort import natsorted
 
 # My libs
 from utils.config import Config
@@ -403,7 +404,7 @@ def compare_active_learning(list_of_paths, list_of_labels=None):
             continue
 
         # Load results
-        trainings = np.sort([f for f in listdir(path) if isfile(join(path, f)) and f[:8] == 'training'])
+        trainings = natsorted([f for f in listdir(path) if isfile(join(path, f)) and f[:8] == 'training'])
         for idx, training in enumerate(trainings):
             epochs, steps, L_out, L_p, acc, t = load_training_results(path, training)
             epochs = np.array(epochs, dtype=np.int32)
@@ -698,7 +699,7 @@ def experiment_active_learning_compare():
     """
 
     # Define active learning log by date
-    log = 'Log_2022-09-25_15-22-56'
+    log = 'Log_2022-10-08_14-29-56'
 
     # Give log name for legend
     log_name = ['V3D WL baseline']

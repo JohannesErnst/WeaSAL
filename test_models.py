@@ -177,12 +177,12 @@ if __name__ == '__main__':
         test_dataset = Vaihingen3DWLDataset(config, set, use_potentials=True, test_on_train=test_on_train)
         test_sampler = Vaihingen3DWLSampler(test_dataset)
         collate_fn = Vaihingen3DWLCollate
-        num_votes = 10
+        num_votes = 20
     elif config.dataset == 'Vaihingen3DPL':
         test_dataset = Vaihingen3DPLDataset(config, set=set, use_potentials=True, test_on_train=test_on_train)
         test_sampler = Vaihingen3DPLSampler(test_dataset)
         collate_fn = Vaihingen3DPLCollate
-        num_votes = 10
+        num_votes = 20
     elif config.dataset == 'DALESWL':
         test_dataset = DALESWLDataset(config, set=set, use_potentials=True, test_on_train=test_on_train)
         test_sampler = DALESWLSampler(test_dataset)

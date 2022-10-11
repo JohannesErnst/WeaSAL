@@ -171,9 +171,9 @@ class Vaihingen3DWLConfig(Config):
     # NOTE: Delete old anchor files when switching active learning on or of
     # (i.e. when switching "active_learning_iterations = 0" to > 0 or vice versa)
     active_learning_iterations = 10
-    initial_labels_per_file = 100
+    initial_labels_per_file = 600
     subsample_method = 'balanced'
-    added_labels_per_epoch = 50
+    added_labels_per_epoch = 200
 
     # Decide whether to subsample weak labels 
     # NOTE: Must be True for active_learning_iterations > 0
@@ -335,9 +335,12 @@ if __name__ == '__main__':
         trainer.train(net, training_loader, validation_loader, config, al_iteration=iteration)
 
         # Print amount of used weak labels
-        anchor_num = np.sum([len(f) for f in training_dataset.anchors])
+        anchor_num_init = training_dataset.config.initial_labels_per_file*len(training_dataset.cloud_names) + \
+                          iteration*training_dataset.config.added_labels_per_epoch*len(training_dataset.cloud_names)
+        anchor_num_over = np.sum([len(f) for f in training_dataset.anchors])
         print('\n*************************************')
-        print('Amount of weak labels:  {:d}'.format(anchor_num))
+        print('Initial amount of weak labels:  {:d}'.format(anchor_num_init))
+        print('Amount of weak labels with overlaps:  {:d}'.format(anchor_num_over))
         print('*************************************\n')
 
         # Test network on training data to get probabilities for active learning
@@ -350,6 +353,10 @@ if __name__ == '__main__':
         
         # Reset the checkpoint to ensure a new training network for the next iteration
         chosen_chkp = None
+
+        # Break active learning loop if desired iteration is reached
+        if iteration == config.active_learning_iterations:
+            break
 
     print('Forcing exit now')
     os.kill(os.getpid(), signal.SIGINT)

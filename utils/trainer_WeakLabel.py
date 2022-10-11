@@ -136,8 +136,12 @@ class ModelTrainer:
         if config.saving:
             # Training log file
             with open(join(config.saving_path, 'training_iteration' + str(al_iteration) + '.txt'), "w") as file:
-                anchor_num = np.sum([len(f) for f in training_loader.dataset.anchors])
-                file.write('epochs steps out_loss offset_loss train_accuracy time \tweak labels: ' + str(anchor_num) + '\n')
+                # Determine intiial amount of anchors and amount when including overlaps
+                anchor_num_init = training_loader.dataset.config.initial_labels_per_file + \
+                                  al_iteration*training_loader.dataset.config.added_labels_per_epoch*len(training_loader.dataset.cloud_names)
+                anchor_num_over = np.sum([len(f) for f in training_loader.dataset.anchors])
+                file.write('epochs steps out_loss offset_loss train_accuracy time \tweak labels (initial): ' + \
+                           str(anchor_num_over) + ' (' + str(anchor_num_init) + ')\n')
 
             # Killing file (simply delete this file when you want to stop the training)
             PID_file = join(config.saving_path, 'running_PID.txt')
@@ -287,6 +291,10 @@ class ModelTrainer:
             net.eval()
             self.validation(net, val_loader, config)
             net.train()
+
+            # Break training loop if maximum number of epochs is reached
+            if self.epoch == config.max_epoch:
+                break
 
         print('Finished Training')
         return

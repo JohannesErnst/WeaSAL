@@ -235,6 +235,10 @@ class Vaihingen3DWLDataset(PointCloudDataset):
                         anchor, anchor_tree, anchors_dict, anchor_lb, anchor_inds_sub = subsample_anchors(
                             anchor, anchors_dict, anchor_lb, config.initial_labels_per_file, config.subsample_method)
 
+                        # Update subsampled anchors with overlaps
+                        anchor, anchor_tree, anchors_dict, anchor_lb = update_anchors(
+                            tree, anchor, anchor_tree, anchors_dict, anchor_lb, config.sub_radius)
+
                         # Save the indices of the subsampled anchors as pickle file
                         with open(anchors_subsampled_file, 'wb') as f:
                             pickle.dump(anchor_inds_sub, f)
@@ -247,6 +251,10 @@ class Vaihingen3DWLDataset(PointCloudDataset):
 
                         # Select the subsample from all weak labels
                         anchor, anchor_tree, anchors_dict, anchor_lb = select_anchors(anchor, anchors_dict, anchor_lb, anchor_inds_sub)
+
+                        # Update subsampled anchors with overlaps
+                        anchor, anchor_tree, anchors_dict, anchor_lb = update_anchors(
+                            tree, anchor, anchor_tree, anchors_dict, anchor_lb, config.sub_radius)
 
                 # Save anchors of all files in single variables
                 self.anchors += [anchor]

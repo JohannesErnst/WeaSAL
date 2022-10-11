@@ -265,7 +265,7 @@ class ModelTesterWL:
 
                 # Save real IoU when reaching number of desired votes
                 all_pseudo_lbs = dict()
-                all_pseduo_probs = dict()
+                all_pseudo_probs = dict()
 
                 if last_min > num_votes:
 
@@ -281,10 +281,8 @@ class ModelTesterWL:
 
                         # Get pseudo labels
                         fn = file_path.split('/')[-1].split('.txt')[0]
-                        unlabel_pts = self.test_probs[i][:, 0] == 0
-                        all_pseduo_probs[fn] = self.test_probs[i]
-                        pseudo_lbs = np.argmax(self.test_probs[i], axis=1) + 1
-                        pseudo_lbs[unlabel_pts] = 0
+                        all_pseudo_probs[fn] = self.test_probs[i]
+                        pseudo_lbs = np.argmax(self.test_probs[i], axis=1)
                         all_pseudo_lbs[fn] = pseudo_lbs
 
                     # Save pseudo labels
@@ -294,7 +292,7 @@ class ModelTesterWL:
                         with open(pl_path, 'wb') as fff:
                             pickle.dump(all_pseudo_lbs, fff)
                         with open(prob_path, 'wb') as fff:
-                            pickle.dump(all_pseduo_probs, fff)
+                            pickle.dump(all_pseudo_probs, fff)
 
                     t2 = time.time()
                     print('Done in {:.1f} s\n'.format(t2 - t1))
@@ -411,8 +409,8 @@ class ModelTesterWL:
 
                             # Get the entropy sampling score for all points in the subsampled cloud
                             # (+1e-12 is added to handle logarithm of probability = 0)
-                            entropy_scores = -np.sum(all_pseduo_probs[file_path+'.ply'] * 
-                                                     np.log2(all_pseduo_probs[file_path+'.ply']+1e-12), axis=1)
+                            entropy_scores = -np.sum(all_pseudo_probs[file_path+'.ply'] * 
+                                                     np.log2(all_pseudo_probs[file_path+'.ply']+1e-12), axis=1)
 
                             # Define path to the anchors file for the subsampled cloud
                             anchors_file = join(test_loader.dataset.tree_path, '{:s}_anchors_{:s}.pkl'.format(
@@ -437,7 +435,7 @@ class ModelTesterWL:
 
                             # Loop over all anchors to get the average entropy sampling score
                             anchor_avg_score = np.zeros(len(anchors_dict)).astype(np.float32)
-                            for idx, anchor in enumerate(anchors_dict):
+                            for anchor in enumerate(anchors_dict):
 
                                 # Find the indices (for the subsampled cloud) of the points in the anchor
                                 anchor_point_ids = np.squeeze(anchors_dict[anchor][0])
@@ -445,8 +443,12 @@ class ModelTesterWL:
                                 # Grab the entropy sampling scores for the points in the anchor
                                 anchor_entropy_score = entropy_scores[anchor_point_ids]
 
+                                # Determine weak label based on predictions
+                                weak_label_pseudo = np.zeros([np.size(anchor_lb[0])], dtype=np.int)
+                                weak_label_pseudo[np.unique(all_pseudo_lbs[file_path+'.ply'][anchor_point_ids])] = 1
+
                                 # Calculate the class weighting score for the anchor based on all occuring classes
-                                anchor_class_score = np.matmul(anchor_lb[idx], class_scores)
+                                anchor_class_score = np.matmul(weak_label_pseudo, class_scores)
 
                                 # Calcualte average entropy sampling score multiplied with weighting score for the anchor
                                 anchor_avg_score[anchor] = np.mean(anchor_entropy_score)*anchor_class_score

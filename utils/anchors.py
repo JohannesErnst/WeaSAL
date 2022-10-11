@@ -171,6 +171,11 @@ def subsample_anchors(anchor, anchors_dict, anchor_lb, anchor_count, subsample_m
         - balanced: Produces equal amount of weak labels for each class
     """
 
+    # Check if anchor_count exceeds the amount of anchors available
+    if anchor_count > len(anchor_lb):
+        raise ValueError('Selected anchor count (' + str(anchor_count) + \
+                         ') exceeds the number of anchors (' + str(len(anchor_lb)) + ')!')
+
     # Switch between subsample methods
     if subsample_method == 'linear':
 
@@ -187,45 +192,67 @@ def subsample_anchors(anchor, anchors_dict, anchor_lb, anchor_count, subsample_m
 
     elif subsample_method == 'balanced':
 
-        # Create a dictionary that holds the weak label occurances of all classes
-        label_class_counts = dict()
-
         # Create a variable that holds all anchor indices
         anchor_inds = list(range(len(anchor_lb)))
 
-        # Initialize the dictionary with empty lists to be filled
-        for label in range(len(anchor_lb[0])):
-            label_class_counts[label] = []
-
-        # Loop over all weak labels to save the occurance of classes
-        for key in anchor_lb:
-            weak_label = anchor_lb[key]
-            classes = np.where(weak_label == 1)[0]
-            for idx in classes:
-                label_class_counts[idx].append(key)
-
-        # Define approximate number of labels per class (rounded down)
-        labels_per_class = int(anchor_count/len(label_class_counts))
-
-        # Pick same amount of labels from each class (if available)
+        # Create a variable that holds the subsampled anchor indices
         anchor_inds_sub = []
-        for label in label_class_counts:
-            if len(label_class_counts[label]) >= labels_per_class:
-                per_class_ids = np.round(np.linspace(0, len(label_class_counts[label])-1, labels_per_class)).astype(int)
-                anchor_inds_sub += [label_class_counts[label][i] for i in per_class_ids]
-            else:
-                anchor_inds_sub += label_class_counts[label]
 
-        # Filter label_class_counts to only contain unique labels
-        anchor_inds_sub = list(set(anchor_inds_sub))
+        # Create a variable that counts the remaining anchors to reach anchor_count
+        anchor_remaining = anchor_count
 
-        # Select remaining anchor indices that are not picked yet
-        for sub_ind in anchor_inds_sub:
-            anchor_inds.remove(sub_ind)
+        # Iteratively select unique weak labels for each class but stop after 4 iterations.
+        # This means that some classes don't have any weak labels left. The remaining labels
+        # will be added randomly from the pool.
+        for i in range(4):
+
+            # Create a dictionary that holds the weak label occurances of all classes
+            label_class_counts = dict()
+
+            # Create an empty list for anchor indices to add
+            anchor_inds_add = []
+
+            # Initialize the dictionary with empty lists to be filled
+            for label in range(len(anchor_lb[0])):
+                label_class_counts[label] = []
+
+            # Loop over all weak labels to save the occurance of classes
+            for key in anchor_inds:
+                weak_label = anchor_lb[key]
+                classes = np.where(weak_label == 1)[0]
+                for idx in classes:
+                    label_class_counts[idx].append(key)
+
+            # Define approximate number of labels per class (rounded down)
+            labels_per_class = int(anchor_remaining/len(label_class_counts))
+
+            # Pick same amount of labels from each class (if available)
+            for label in label_class_counts:
+                if len(label_class_counts[label]) >= labels_per_class:
+                    per_class_ids = np.round(np.linspace(0, len(label_class_counts[label])-1, labels_per_class)).astype(int)
+                    anchor_inds_add += [label_class_counts[label][i] for i in per_class_ids]
+                else:
+                    anchor_inds_add += label_class_counts[label]
+
+            # Filter label_class_counts to only contain unique labels
+            anchor_inds_add = list(set(anchor_inds_add))
+
+            # Add the new anchors to anchor the subsampled list
+            anchor_inds_sub += anchor_inds_add
+
+            # Select remaining anchor indices that are not picked yet
+            for sub_ind in anchor_inds_add:
+                anchor_inds.remove(sub_ind)
+
+            # Calculate how many anchors are left to reach the original anchor_count
+            anchor_remaining = anchor_count-len(anchor_inds_sub)
+
+            # Check if the number of desired anchors is reached
+            if anchor_remaining < len(label_class_counts):
+                break
 
         # Randomly add remaining amount of labels to reach anchor_count
-        remaining_labels = anchor_count-len(anchor_inds_sub)
-        random_labels = random.choices(anchor_inds, k=remaining_labels)
+        random_labels = random.choices(anchor_inds, k=anchor_remaining)
         anchor_inds_sub += random_labels
 
         # Sort the selected labels
