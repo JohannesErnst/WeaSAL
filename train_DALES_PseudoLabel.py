@@ -371,5 +371,9 @@ if __name__ == '__main__':
         # Reset the checkpoint to ensure a new training network for the next iteration
         chosen_chkp = None
 
+        # Break active learning loop if desired iteration is reached
+        if iteration == config.active_learning_iterations:
+            break
+
     print('Forcing exit now')
     os.kill(os.getpid(), signal.SIGINT)

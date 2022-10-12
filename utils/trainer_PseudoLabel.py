@@ -293,6 +293,10 @@ class ModelTrainer:
             self.validation(net, val_loader, config)
             net.train()
 
+            # Break training loop if maximum number of epochs is reached
+            if self.epoch == config.max_epoch:
+                break
+
         print('Finished Training')
         return
 

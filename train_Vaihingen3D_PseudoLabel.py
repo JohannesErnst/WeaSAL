@@ -157,7 +157,7 @@ class Vaihingen3DPLConfig(Config):
     validation_size = 200
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 50
+    checkpoint_gap = 75
 
     # Augmentations
     augment_scale_anisotropic = True
@@ -176,12 +176,12 @@ class Vaihingen3DPLConfig(Config):
     contrast_thd = 20
 
     # Active learning parameters (label parameters are per input file)
-    active_learning_iterations = 10
+    active_learning_iterations = 20
     added_labels_per_epoch = 5000
 
     # Choose model name and pseudo label log
     model_name = 'KPFCNN'
-    weak_label_log = 'Log_2022-08-30_07-19-52'
+    weak_label_log = 'Log_2022-10-09_16-23-39'
 
     # Choose weights for classes
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -362,6 +362,10 @@ if __name__ == '__main__':
         
         # Reset the checkpoint to ensure a new training network for the next iteration
         chosen_chkp = None
+
+        # Break active learning loop if desired iteration is reached
+        if iteration == config.active_learning_iterations:
+            break
 
     print('Forcing exit now')
     os.kill(os.getpid(), signal.SIGINT)
