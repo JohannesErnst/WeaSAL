@@ -435,7 +435,7 @@ class ModelTesterWL:
 
                             # Loop over all anchors to get the average entropy sampling score
                             anchor_avg_score = np.zeros(len(anchors_dict)).astype(np.float32)
-                            for anchor in enumerate(anchors_dict):
+                            for idx, anchor in enumerate(anchors_dict):
 
                                 # Find the indices (for the subsampled cloud) of the points in the anchor
                                 anchor_point_ids = np.squeeze(anchors_dict[anchor][0])
