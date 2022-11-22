@@ -283,7 +283,7 @@ class Config:
                     setattr(self, line_info[0], int(line_info[2]))
 
                 elif line_info[0] == 'subsample_labels':
-                    setattr(self, line_info[0], bool(line_info[2]))
+                    setattr(self, line_info[0], bool(int(line_info[2])))
 
                 elif line_info[0] == 'initial_labels_per_file':
                     setattr(self, line_info[0], int(line_info[2]))

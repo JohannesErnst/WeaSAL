@@ -105,7 +105,7 @@ if __name__ == '__main__':
     # chosen_log = 'last_DALESPL'
 
     # Choose the index of the checkpoint to load OR None if you want to load the current checkpoint
-    chkp_idx = -1
+    chkp_idx = None
 
     # Choose to test on validation, test or train split (train for pseudo label generation)
     # Choose: set = 'train', set = 'validation', set = 'test'
@@ -187,12 +187,12 @@ if __name__ == '__main__':
         test_dataset = DALESWLDataset(config, set=set, use_potentials=True, test_on_train=test_on_train)
         test_sampler = DALESWLSampler(test_dataset)
         collate_fn = DALESWLCollate
-        num_votes = 1
+        num_votes = 2
     elif config.dataset == 'DALESPL':
         test_dataset = DALESPLDataset(config, set=set, use_potentials=True, test_on_train=test_on_train)
         test_sampler = DALESPLSampler(test_dataset)
         collate_fn = DALESPLCollate
-        num_votes = 1
+        num_votes = 2
     else:
         raise ValueError('Unsupported dataset : ' + config.dataset)
 

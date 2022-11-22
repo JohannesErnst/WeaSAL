@@ -342,12 +342,17 @@ class ModelTesterPL:
                             # Get the predicted labels
                             preds = test_loader.dataset.label_values[np.argmax(proj_probs[i], axis=1)].astype(np.int32)
 
+                            # Create error map
+                            targets = test_loader.dataset.validation_labels[i]
+                            error_map = preds != targets
+                            error_map = error_map.astype('int8')
+
                             # Save plys
                             cloud_name = file_path.split('/')[-1]
                             test_name = join(test_path, 'predictions', cloud_name)
                             write_ply(test_name,
-                                    [points, preds],
-                                    ['x', 'y', 'z', 'preds'])
+                                    [points, preds, targets, error_map],
+                                    ['x', 'y', 'z', 'preds', 'targets', 'error'])
                             test_name2 = join(test_path, 'probs', cloud_name)
                             prob_names = ['_'.join(test_loader.dataset.label_to_names[label].split())
                                         for label in test_loader.dataset.label_values]
@@ -403,7 +408,7 @@ class ModelTesterPL:
                             label_gt_file = join(tree_path, cloud_name + '_al_groundTruth_IDs.pkl')
 
                             # Calculate a class score for each point based on the original weighting file
-                            class_scores = np.exp(config.class_w[np.argmax(all_probs[file_path+'.ply'], axis=1)])
+                            class_scores = np.exp(np.array(config.class_w)[np.argmax(all_probs[file_path+'.ply'], axis=1)])
 
                             # Combine entropy and class score to one score
                             combined_scores = entropy_scores * class_scores
@@ -420,7 +425,7 @@ class ModelTesterPL:
                                 sort_ids = np.delete(sort_ids, np.where(sort_ids == used_point))
 
                             # Select the point indices with the highest entropy sampling score
-                            if len(sort_ids) > test_loader.dataset.config.added_labels_per_epoch:
+                            if len(sort_ids) >= test_loader.dataset.config.added_labels_per_epoch:
                                 high_score_ids = sort_ids[0:test_loader.dataset.config.added_labels_per_epoch]
                             else:
                                 raise ValueError('Not enough point labels left for the next iteration')

@@ -136,7 +136,7 @@ class DALESWLConfig(Config):
     #####################
 
     # Maximal number of epochs
-    max_epoch = 150
+    max_epoch = 100
 
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
@@ -148,13 +148,13 @@ class DALESWLConfig(Config):
     batch_num = 2
 
     # Number of steps per epochs
-    epoch_steps = 100
+    epoch_steps = 400
 
     # Number of validation examples per epoch
     validation_size = 200
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 75
+    checkpoint_gap = 50
 
     # Augmentations
     augment_scale_anisotropic = True
@@ -162,7 +162,7 @@ class DALESWLConfig(Config):
     augment_rotation = 'vertical'
     augment_scale_min = 0.9
     augment_scale_max = 1.1
-    augment_noise = 0.02
+    augment_noise = 0.01
 
     # Choose weights for class
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -171,9 +171,9 @@ class DALESWLConfig(Config):
     # NOTE: Delete old anchor files when switching active learning on or of
     # (i.e. when switching "active_learning_iterations = 0" to > 0 or vice versa)
     active_learning_iterations = 10
-    initial_labels_per_file = 1000
+    initial_labels_per_file = 7000
     subsample_method = 'balanced'
-    added_labels_per_epoch = 500
+    added_labels_per_epoch = 1000
 
     # Decide whether to subsample weak labels 
     # NOTE: Must be True for active_learning_iterations > 0

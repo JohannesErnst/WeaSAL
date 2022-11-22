@@ -166,7 +166,7 @@ def subsample_anchors(anchor, anchors_dict, anchor_lb, anchor_count, subsample_m
     indices of the subsampled anchors. The indices are based on the full anchor set.
 
     Subsample_method defines the way we subsample the weak labels:
-        - linear:   Produces linearly subsampled anchors
+        - regular:  Produces refularly subsampled anchors
         - random:   Produces randomly selected anchors
         - balanced: Produces equal amount of weak labels for each class
     """
@@ -177,9 +177,9 @@ def subsample_anchors(anchor, anchors_dict, anchor_lb, anchor_count, subsample_m
                          ') exceeds the number of anchors (' + str(len(anchor_lb)) + ')!')
 
     # Switch between subsample methods
-    if subsample_method == 'linear':
+    if subsample_method == 'regular':
 
-        # Linearly subsample the available anchors and save the remaining indices
+        # Regularly subsample the available anchors and save the remaining indices
         anchor_inds_sub = np.round(np.linspace(0, anchor.shape[0]-1, anchor_count)).astype(int)
     
     elif subsample_method == 'random':

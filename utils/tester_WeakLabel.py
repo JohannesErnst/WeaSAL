@@ -461,7 +461,7 @@ class ModelTesterWL:
                                 sort_ids = np.delete(sort_ids, np.where(sort_ids == used_anchor))
 
                             # Select the anchor indices with the highest entropy sampling score
-                            if len(sort_ids) > test_loader.dataset.config.added_labels_per_epoch:
+                            if len(sort_ids) >= test_loader.dataset.config.added_labels_per_epoch:
                                 high_score_ids = sort_ids[0:test_loader.dataset.config.added_labels_per_epoch]
                             else:
                                 raise ValueError('Not enough weak labels left for the next iteration')

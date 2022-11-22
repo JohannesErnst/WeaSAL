@@ -98,6 +98,7 @@ class DALESPLConfig(Config):
     in_radius = 18
 
     # Size of the first subsampling grid in meter (increase value to reduce memory cost)
+    # NOTE: Must be the same value as for the weak label training
     first_subsampling_dl = 0.4
 
     # Radius of convolution in "number grid cell" (2.5 is the standard value)
@@ -142,9 +143,6 @@ class DALESPLConfig(Config):
     max_epoch = 200
 
     # Learning rate management (standard value is 1e-2)
-    # learning_rate = 0.01
-    # momentum = 0.98
-    # lr_decays = {i: 0.1 ** (1 / 150) for i in range(1, max_epoch)}
     learning_rate = 0.001
     momentum = 0.98
     lr_decays = {}
@@ -176,7 +174,7 @@ class DALESPLConfig(Config):
     augment_noise = 0.01
     augment_color = 0.7
 
-    # Enable dropout
+    # Enable dropout (probability of an element to be zeroed)
     dropout = 0.5
 
     # Parameters for supervised contrastive loss (start and threshold [%])
@@ -184,12 +182,12 @@ class DALESPLConfig(Config):
     contrast_thd = 10
 
     # Active learning parameters (label parameters are per input file)
-    active_learning_iterations = 10
+    active_learning_iterations = 20
     added_labels_per_epoch = 10000
 
     # Choose model name and pseudo label log
     model_name = 'KPFCNN'
-    weak_label_log = 'Log_2022-09-12_08-20-34'
+    weak_label_log = 'Log_2022-11-10_15-11-17'
 
     # Choose weights for classes
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]

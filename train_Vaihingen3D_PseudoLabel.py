@@ -98,6 +98,7 @@ class Vaihingen3DPLConfig(Config):
     in_radius = 24
 
     # Size of the first subsampling grid in meter (increase value to reduce memory cost)
+    # NOTE: Must be the same value as for the weak label training
     first_subsampling_dl = 0.24
 
     # Radius of convolution in "number grid cell" (2.5 is the standard value)
@@ -168,7 +169,7 @@ class Vaihingen3DPLConfig(Config):
     augment_noise = 0.06
     augment_color = 0.7
 
-    # Enable dropout
+    # Enable dropout (probability of an element to be zeroed)
     dropout = 0.5
 
     # Parameters for supervised contrastive loss (start and threshold [%])
@@ -181,7 +182,7 @@ class Vaihingen3DPLConfig(Config):
 
     # Choose model name and pseudo label log
     model_name = 'KPFCNN'
-    weak_label_log = 'Log_2022-10-09_16-23-39'
+    weak_label_log = 'Log_2022-10-15_05-15-41'
 
     # Choose weights for classes
     class_w = [1, 1, 1, 1, 1, 1, 1, 1, 1]

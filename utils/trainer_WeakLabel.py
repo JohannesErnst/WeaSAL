@@ -136,8 +136,8 @@ class ModelTrainer:
         if config.saving:
             # Training log file
             with open(join(config.saving_path, 'training_iteration' + str(al_iteration) + '.txt'), "w") as file:
-                # Determine intiial amount of anchors and amount when including overlaps
-                anchor_num_init = training_loader.dataset.config.initial_labels_per_file + \
+                # Determine intial amount of anchors and amount when including overlaps
+                anchor_num_init = training_loader.dataset.config.initial_labels_per_file*len(training_loader.dataset.cloud_names) + \
                                   al_iteration*training_loader.dataset.config.added_labels_per_epoch*len(training_loader.dataset.cloud_names)
                 anchor_num_over = np.sum([len(f) for f in training_loader.dataset.anchors])
                 file.write('epochs steps out_loss offset_loss train_accuracy time \tweak labels (initial): ' + \
@@ -284,7 +284,7 @@ class ModelTrainer:
 
                 # Save checkpoints occasionally
                 if (self.epoch + 1) % config.checkpoint_gap == 0:
-                    checkpoint_path = join(checkpoint_directory, 'chkp_{:04d}.tar'.format(self.epoch + 1))
+                    checkpoint_path = join(checkpoint_directory, 'chkp_{:04d}_{:d}.tar'.format(self.epoch + 1, self.al_iteration))
                     torch.save(save_dict, checkpoint_path)
 
             # Validation

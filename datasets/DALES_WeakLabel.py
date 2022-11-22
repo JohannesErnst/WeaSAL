@@ -67,8 +67,8 @@ class DALESWLDataset(PointCloudDataset):
                                3: 'Cars',
                                4: 'Trucks',
                                5: 'Power',
-                               6: 'Poles',
-                               7: 'Fences',
+                               6: 'Fences',
+                               7: 'Poles',
                                8: 'Buildings'}
 
         # Initialize a bunch of variables concerning class labels

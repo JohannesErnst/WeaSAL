@@ -136,7 +136,7 @@ class Vaihingen3DWLConfig(Config):
     #####################
 
     # Maximal number of epochs
-    max_epoch = 50
+    max_epoch = 80
 
     # Learning rate management (standard value is 1e-2)
     learning_rate = 0.01
@@ -148,13 +148,13 @@ class Vaihingen3DWLConfig(Config):
     batch_num = 3
 
     # Number of steps per epochs
-    epoch_steps = 400
+    epoch_steps = 600
 
     # Number of validation examples per epoch
     validation_size = 200
 
     # Number of epoch between each checkpoint
-    checkpoint_gap = 25
+    checkpoint_gap = 40
 
     # Augmentations
     augment_scale_anisotropic = True
@@ -170,7 +170,7 @@ class Vaihingen3DWLConfig(Config):
     # Active learning parameters (label parameters are per input file)
     # NOTE: Delete old anchor files when switching active learning on or of
     # (i.e. when switching "active_learning_iterations = 0" to > 0 or vice versa)
-    active_learning_iterations = 10
+    active_learning_iterations = 20
     initial_labels_per_file = 600
     subsample_method = 'balanced'
     added_labels_per_epoch = 200
